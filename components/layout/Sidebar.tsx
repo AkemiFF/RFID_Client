@@ -1,30 +1,27 @@
 "use client"
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
 import {
-  HomeIcon,
-  CreditCardIcon,
   ArrowsRightLeftIcon,
-  CurrencyEuroIcon,
-  BuildingStorefrontIcon,
-  TicketIcon,
-  UsersIcon,
   ChartBarIcon,
   CogIcon,
+  CreditCardIcon,
+  HomeIcon,
+  UsersIcon
 } from "@heroicons/react/24/outline"
 import clsx from "clsx"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
 
 const navigation = [
-  { name: "Tableau de bord", href: "/", icon: HomeIcon },
-  { name: "Gestion des cartes", href: "/cards", icon: CreditCardIcon },
-  { name: "Transactions", href: "/transactions", icon: ArrowsRightLeftIcon },
-  { name: "Paiement", href: "/payment", icon: CurrencyEuroIcon },
-  { name: "Commerçants", href: "/merchants", icon: BuildingStorefrontIcon },
-  { name: "Ticket Place", href: "/tickets", icon: TicketIcon },
-  { name: "Clients", href: "/clients", icon: UsersIcon },
-  { name: "Rapports", href: "/reports", icon: ChartBarIcon },
-  { name: "Paramètres", href: "/settings", icon: CogIcon },
+  { name: "Tableau de bord", href: "/admin", icon: HomeIcon },
+  { name: "Gestion des cartes", href: "/admin/cards", icon: CreditCardIcon },
+  { name: "Transactions", href: "/admin/transactions", icon: ArrowsRightLeftIcon },
+  // { name: "Paiement", href: "/admin/payment", icon: CurrencyEuroIcon },
+  // { name: "Commerçants", href: "/admin/merchants", icon: BuildingStorefrontIcon },
+  // { name: "Ticket Place", href: "/admin/tickets", icon: TicketIcon },
+  { name: "Clients", href: "/admin/clients", icon: UsersIcon },
+  { name: "Rapports", href: "/admin/reports", icon: ChartBarIcon },
+  { name: "Paramètres", href: "/admin/settings", icon: CogIcon },
 ]
 
 export default function Sidebar() {
