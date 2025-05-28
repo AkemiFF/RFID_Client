@@ -1,31 +1,31 @@
 "use client"
 
-import { useState } from "react"
 import Layout from "@/components/layout/Layout"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import Modal from "@/components/ui/Modal"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
-  CreditCardIcon,
-  QrCodeIcon,
-  PlusIcon,
-  StoreIcon,
-  TruckIcon,
-  BuildingOfficeIcon,
-  UsersIcon,
-  BoltIcon,
-  EllipsisHorizontalIcon,
-  CheckCircleIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
+  BoltIcon,
+  BuildingOfficeIcon,
+  CheckCircleIcon,
   ClockIcon,
-  StarIcon,
+  CreditCardIcon,
+  EllipsisHorizontalIcon,
+  PlusIcon,
+  QrCodeIcon,
   ReceiptRefundIcon,
+  StarIcon,
+  TruckIcon,
+  UsersIcon,
 } from "@heroicons/react/24/outline"
+import { StoreIcon } from "lucide-react"
+import { useState } from "react"
 
 interface PaymentData {
   beneficiary: string
@@ -114,9 +114,8 @@ export default function PaymentPage() {
           {[1, 2, 3].map((step) => (
             <div key={step} className="flex-1 flex items-center">
               <div
-                className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                  step <= currentStep ? "bg-purple-600 text-white" : "bg-gray-200 text-gray-600"
-                }`}
+                className={`flex items-center justify-center w-8 h-8 rounded-full ${step <= currentStep ? "bg-purple-600 text-white" : "bg-gray-200 text-gray-600"
+                  }`}
               >
                 {step < currentStep ? <CheckCircleIcon className="h-5 w-5" /> : <span>{step}</span>}
               </div>
