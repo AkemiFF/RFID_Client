@@ -32,7 +32,7 @@ export default function ClientTransfer() {
   // Contacts récents simulés
   const contactsRecents: Contact[] = [
     { id: 1, nom: "Martin", prenom: "Sophie", telephone: "+261 34 12 345 67", email: "sophie.martin@email.com" },
-    { id: 2, nom: "Rakoto", prenom: "Jean", telephone: "+261 33 98 765 43", email: "jean.rakoto@email.com" },
+    { id: 2, nom: "Raddkoto", prenom: "Jean", telephone: "+261 33 98 765 43", email: "jean.rakoto@email.com" },
     { id: 3, nom: "Andry", prenom: "Marie", telephone: "+261 32 55 444 33", email: "marie.andry@email.com" },
   ]
 
