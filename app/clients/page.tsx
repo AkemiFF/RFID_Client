@@ -1,36 +1,36 @@
 "use client"
 
-import { useState } from "react"
 import Layout from "@/components/layout/Layout"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Modal from "@/components/ui/Modal"
 import StatusBadge from "@/components/ui/StatusBadge"
 import {
-  PlusIcon,
   ArrowDownTrayIcon,
-  UserIcon,
-  UserCheckIcon,
-  UserPlusIcon,
+  ArrowPathIcon,
+  CalendarIcon,
+  CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ClockIcon,
   CreditCardIcon,
   CurrencyEuroIcon,
-  EyeIcon,
-  PencilIcon,
   EnvelopeIcon,
-  PhoneIcon,
-  MapPinIcon,
-  CalendarIcon,
-  ArrowPathIcon,
-  NoSymbolIcon,
-  ReceiptRefundIcon,
-  ClockIcon,
-  ChevronRightIcon,
-  ChevronLeftIcon,
-  CheckIcon,
+  EyeIcon,
   MagnifyingGlassIcon,
+  MapPinIcon,
+  NoSymbolIcon,
+  PencilIcon,
+  PhoneIcon,
+  PlusIcon,
+  ReceiptRefundIcon,
+  UserIcon,
+  UserPlusIcon,
 } from "@heroicons/react/24/outline"
+import { UserCheckIcon } from "lucide-react"
+import { useState } from "react"
 
 interface Client {
   id: string
@@ -636,7 +636,7 @@ export default function ClientsPage() {
         isOpen={showAddModal}
         onClose={closeAddModal}
         title={`Ajouter un nouveau client - Étape ${addStep}/2`}
-        size="large"
+        size="lg"
       >
         <div className="space-y-6">
           {/* Progress Bar */}
@@ -831,9 +831,8 @@ export default function ClientsPage() {
                 {filteredCards.map((carte) => (
                   <div
                     key={carte.id}
-                    className={`p-4 border-b border-gray-200 last:border-b-0 hover:bg-gray-50 cursor-pointer ${
-                      selectedCards.includes(carte.id) ? "bg-purple-50 border-purple-200" : ""
-                    }`}
+                    className={`p-4 border-b border-gray-200 last:border-b-0 hover:bg-gray-50 cursor-pointer ${selectedCards.includes(carte.id) ? "bg-purple-50 border-purple-200" : ""
+                      }`}
                     onClick={() => toggleCardSelection(carte.id)}
                   >
                     <div className="flex items-center justify-between">
@@ -848,13 +847,12 @@ export default function ClientsPage() {
                           <div className="flex items-center space-x-2">
                             <span className="text-sm font-medium text-gray-900">{carte.code_uid}</span>
                             <span
-                              className={`px-2 py-1 text-xs rounded-full ${
-                                carte.type_carte === "STANDARD"
-                                  ? "bg-blue-100 text-blue-800"
-                                  : carte.type_carte === "PREMIUM"
-                                    ? "bg-purple-100 text-purple-800"
-                                    : "bg-yellow-100 text-yellow-800"
-                              }`}
+                              className={`px-2 py-1 text-xs rounded-full ${carte.type_carte === "STANDARD"
+                                ? "bg-blue-100 text-blue-800"
+                                : carte.type_carte === "PREMIUM"
+                                  ? "bg-purple-100 text-purple-800"
+                                  : "bg-yellow-100 text-yellow-800"
+                                }`}
                             >
                               {carte.type_carte}
                             </span>
@@ -914,7 +912,7 @@ export default function ClientsPage() {
         isOpen={showDetailsModal}
         onClose={() => setShowDetailsModal(false)}
         title="Détails du client"
-        size="large"
+        size="lg"
       >
         {selectedClient && (
           <div className="space-y-6">
