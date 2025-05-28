@@ -2,16 +2,18 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { EyeIcon, SlashIcon as EyeSlashIcon, CreditCardIcon } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { saveAdminAuthData } from "@/lib/auth"
+import { BASE_URL } from "@/lib/host"
+import { CreditCardIcon, EyeIcon, SlashIcon as EyeSlashIcon } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useState } from "react"
 
-export default function ClientLogin() {
+export default function AdminLogin() {
   const router = useRouter()
   const [formData, setFormData] = useState({
     email: "",
@@ -23,34 +25,30 @@ export default function ClientLogin() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError("")
 
     try {
-      // Simulation de l'authentification
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const response = await fetch(`${BASE_URL}/api/auth/login/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      })
 
-      // Données utilisateur simulées
-      const userData = {
-        id: 1,
-        prenom: "Jean",
-        nom: "Dupont",
-        email: formData.email || "jean.dupont@email.com",
-        telephone: "+261 34 12 345 67",
-        solde: 125000,
-        cartes: [
-          { id: 1, numero: "1234567890123456", type: "Standard", solde: 75000 },
-          { id: 2, numero: "9876543210987654", type: "Premium", solde: 50000 },
-        ],
+      if (!response.ok) {
+        throw new Error("Network response was not ok")
       }
+      const data = await response.json()
 
-      // Stocker les données d'authentification
-      localStorage.setItem("client_token", "fake-jwt-token")
-      localStorage.setItem("client_user", JSON.stringify(userData))
+      saveAdminAuthData(data)
+      console.log("Login successful", data)
 
-      router.push("/client/dashboard")
+      router.push("/admin")
     } catch (err) {
       setError("Identifiants incorrects. Veuillez réessayer.")
     } finally {
@@ -75,18 +73,16 @@ export default function ClientLogin() {
             <button
               type="button"
               onClick={() => setLoginMethod("email")}
-              className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
-                loginMethod === "email" ? "bg-white text-purple-700 shadow-sm" : "text-gray-600 hover:text-gray-900"
-              }`}
+              className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${loginMethod === "email" ? "bg-white text-purple-700 shadow-sm" : "text-gray-600 hover:text-gray-900"
+                }`}
             >
               Email
             </button>
             <button
               type="button"
               onClick={() => setLoginMethod("card")}
-              className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
-                loginMethod === "card" ? "bg-white text-purple-700 shadow-sm" : "text-gray-600 hover:text-gray-900"
-              }`}
+              className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${loginMethod === "card" ? "bg-white text-purple-700 shadow-sm" : "text-gray-600 hover:text-gray-900"
+                }`}
             >
               Carte RFID
             </button>

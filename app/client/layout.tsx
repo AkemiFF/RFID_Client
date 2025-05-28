@@ -2,18 +2,18 @@
 
 import type React from "react"
 
-import { Inter } from "next/font/google"
-import { useState, useEffect } from "react"
-import { useRouter, usePathname } from "next/navigation"
 import {
-  HomeIcon,
   ArrowRightLeftIcon,
-  QrCodeIcon,
-  LogOutIcon,
   CreditCardIcon,
   HistoryIcon,
+  HomeIcon,
+  LogOutIcon,
+  QrCodeIcon,
   SettingsIcon,
 } from "lucide-react"
+import { Inter } from "next/font/google"
+import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -27,9 +27,8 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
-    // Vérifier l'authentification
-    const token = localStorage.getItem("client_token")
-    const userData = localStorage.getItem("client_user")
+    const token = localStorage.getItem("auth")
+    const userData = localStorage.getItem("auth")
 
     if (!token && pathname !== "/client/login") {
       router.push("/client/login")
@@ -114,11 +113,10 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
                       <li key={item.name}>
                         <button
                           onClick={() => router.push(item.href)}
-                          className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                            isActive
-                              ? "bg-purple-100 text-purple-700"
-                              : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                          }`}
+                          className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${isActive
+                            ? "bg-purple-100 text-purple-700"
+                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                            }`}
                         >
                           <item.icon className="mr-3 h-5 w-5" />
                           {item.name}
