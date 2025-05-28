@@ -1,4 +1,5 @@
 import api from "@/lib/api"
+import { apiAdmin } from "../api-service"
 
 export interface CarteRFID {
   id: string
@@ -52,7 +53,7 @@ export interface CarteFilters {
 
 class CartesService {
   async getCartes(filters: CarteFilters = {}) {
-    const response = await api.get("/cartes/cartes/", { params: filters })
+    const response = await apiAdmin.get("/cartes/cartes/", { params: filters })
     return response.data
   }
 
