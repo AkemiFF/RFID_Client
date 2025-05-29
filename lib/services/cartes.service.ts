@@ -10,7 +10,7 @@ export interface CarteRFID {
   plafond_quotidien: number
   plafond_mensuel: number
   solde_maximum: number
-  statut: "ACTIVE" | "BLOQUEE" | "EXPIREE" | "PERDUE" | "VOLEE"
+  statut: "ACTIVE" | "BLOQUEE" | "EXPIREE" | "PERDUE" | "VOLEE" | "INACTIVE"
   motif_blocage?: string
   date_emission: string
   date_activation?: string
@@ -49,35 +49,42 @@ export interface CarteFilters {
   search?: string
   page?: number
   page_size?: number
+  assignation?: string  
 }
 
 class CartesService {
-  async getCartes(filters: CarteFilters = {}) {
-    const response = await apiAdmin.get("/cartes/cartes/", { params: filters })
+    async getCartes(filters: CarteFilters = {}) {
+    // Copier les filtres pour ne pas modifier l'objet original
+    const apiFilters = { ...filters }
+
+    // Supprimer le filtre d'assignation car il est géré côté client
+    delete apiFilters.assignation
+
+    const response = await apiAdmin.get("/cartes/cartes/", { params: apiFilters })
     return response.data
   }
 
   async getCarte(id: string) {
-    const response = await api.get(`/cartes/cartes/${id}/`)
+    const response = await apiAdmin.get(`/cartes/cartes/${id}/`)
     return response.data
   }
 
   async createCarte(data: CreateCarteData) {
-    const response = await api.post("/cartes/cartes/", data)
+    const response = await apiAdmin.post("/cartes/cartes/", data)
     return response.data
   }
 
   async updateCarte(id: string, data: Partial<CreateCarteData>) {
-    const response = await api.patch(`/cartes/cartes/${id}/`, data)
+    const response = await apiAdmin.patch(`/cartes/cartes/${id}/`, data)
     return response.data
   }
 
   async deleteCarte(id: string) {
-    await api.delete(`/cartes/cartes/${id}/`)
+    await apiAdmin.delete(`/cartes/cartes/${id}/`)
   }
 
   async blockerCarte(id: string, motif: string) {
-    const response = await api.patch(`/cartes/cartes/${id}/`, {
+    const response = await apiAdmin.patch(`/cartes/cartes/${id}/`, {
       statut: "BLOQUEE",
       motif_blocage: motif,
     })
@@ -85,7 +92,7 @@ class CartesService {
   }
 
   async activerCarte(id: string) {
-    const response = await api.patch(`/cartes/cartes/${id}/`, {
+    const response = await apiAdmin.patch(`/cartes/cartes/${id}/`, {
       statut: "ACTIVE",
       date_activation: new Date().toISOString(),
     })
@@ -93,9 +100,8 @@ class CartesService {
   }
 
   async getHistoriqueStatuts(carteId: string) {
-    const response = await api.get(`/cartes/historique-statuts/?carte=${carteId}`)
+    const response = await apiAdmin.get(`/cartes/historique-statuts/?carte=${carteId}`)
     return response.data
   }
 }
-
 export const cartesService = new CartesService()
