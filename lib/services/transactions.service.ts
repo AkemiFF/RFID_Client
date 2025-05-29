@@ -50,7 +50,7 @@ export interface TransactionFilters {
 
 class TransactionsService {
   async getTransactions(filters: TransactionFilters = {}) {
-    const response = await api.get("/transactions/transactions/", { params: filters })
+    const response = await apiAdmin.get("/transactions/transactions/", { params: filters })
     return response.data
   }
 
