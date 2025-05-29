@@ -1,4 +1,4 @@
-import api from "@/lib/api"
+import apiClient from "../api-service"
 
 export interface ClientCard {
   id: string
@@ -63,7 +63,7 @@ export interface CardSettings {
 class ClientCardsService {
   async getCards(): Promise<ClientCard[]> {
     try {
-      const response = await api.get("/client/cards")
+      const response = await apiClient.get("/client/cards")
       return response.data
     } catch (error) {
       throw new Error("Impossible de récupérer les cartes")
@@ -72,7 +72,7 @@ class ClientCardsService {
 
   async getCard(cardId: string): Promise<ClientCard> {
     try {
-      const response = await api.get(`/client/cards/${cardId}`)
+      const response = await apiClient.get(`/client/cards/${cardId}`)
       return response.data
     } catch (error) {
       throw new Error("Impossible de récupérer les détails de la carte")
@@ -81,7 +81,7 @@ class ClientCardsService {
 
   async blockCard(cardId: string, reason: string): Promise<void> {
     try {
-      await api.post(`/client/cards/${cardId}/block`, { reason })
+      await apiClient.post(`/client/cards/${cardId}/block`, { reason })
     } catch (error) {
       throw new Error("Impossible de bloquer la carte")
     }
@@ -89,7 +89,7 @@ class ClientCardsService {
 
   async unblockCard(cardId: string): Promise<void> {
     try {
-      await api.post(`/client/cards/${cardId}/unblock`)
+      await apiClient.post(`/client/cards/${cardId}/unblock`)
     } catch (error) {
       throw new Error("Impossible de débloquer la carte")
     }
@@ -97,7 +97,7 @@ class ClientCardsService {
 
   async activateCard(cardId: string, pin: string): Promise<void> {
     try {
-      await api.post(`/client/cards/${cardId}/activate`, { pin })
+      await apiClient.post(`/client/cards/${cardId}/activate`, { pin })
     } catch (error) {
       throw new Error("Impossible d'activer la carte")
     }
@@ -105,7 +105,7 @@ class ClientCardsService {
 
   async changePIN(cardId: string, currentPin: string, newPin: string): Promise<void> {
     try {
-      await api.post(`/client/cards/${cardId}/change-pin`, {
+      await apiClient.post(`/client/cards/${cardId}/change-pin`, {
         currentPin,
         newPin,
       })
@@ -116,7 +116,7 @@ class ClientCardsService {
 
   async updateLimits(cardId: string, limits: CardLimits): Promise<void> {
     try {
-      await api.put(`/client/cards/${cardId}/limits`, limits)
+      await apiClient.put(`/client/cards/${cardId}/limits`, limits)
     } catch (error) {
       throw new Error("Impossible de modifier les limites")
     }
@@ -124,7 +124,7 @@ class ClientCardsService {
 
   async updateSettings(cardId: string, settings: CardSettings): Promise<void> {
     try {
-      await api.put(`/client/cards/${cardId}/settings`, settings)
+      await apiClient.put(`/client/cards/${cardId}/settings`, settings)
     } catch (error) {
       throw new Error("Impossible de modifier les paramètres")
     }
@@ -141,7 +141,7 @@ class ClientCardsService {
     totalPages: number
   }> {
     try {
-      const response = await api.get(`/client/cards/${cardId}/transactions?page=${page}&limit=${limit}`)
+      const response = await apiClient.get(`/client/cards/${cardId}/transactions?page=${page}&limit=${limit}`)
       return response.data
     } catch (error) {
       throw new Error("Impossible de récupérer l'historique de la carte")
@@ -150,7 +150,7 @@ class ClientCardsService {
 
   async requestNewCard(request: CardRequest): Promise<{ requestId: string; estimatedDelivery: string }> {
     try {
-      const response = await api.post("/client/cards/request", request)
+      const response = await apiClient.post("/client/cards/request", request)
       return response.data
     } catch (error) {
       throw new Error("Impossible de demander une nouvelle carte")
@@ -159,7 +159,7 @@ class ClientCardsService {
 
   async reportLostCard(cardId: string, circumstances: string): Promise<void> {
     try {
-      await api.post(`/client/cards/${cardId}/report-lost`, { circumstances })
+      await apiClient.post(`/client/cards/${cardId}/report-lost`, { circumstances })
     } catch (error) {
       throw new Error("Impossible de signaler la perte")
     }
@@ -167,7 +167,7 @@ class ClientCardsService {
 
   async requestReplacement(cardId: string, reason: string): Promise<{ requestId: string; cost: number }> {
     try {
-      const response = await api.post(`/client/cards/${cardId}/replace`, { reason })
+      const response = await apiClient.post(`/client/cards/${cardId}/replace`, { reason })
       return response.data
     } catch (error) {
       throw new Error("Impossible de demander un remplacement")
@@ -185,7 +185,7 @@ class ClientCardsService {
     dailyUsage: Array<{ date: string; amount: number; count: number }>
   }> {
     try {
-      const response = await api.get(`/client/cards/${cardId}/statistics?period=${period}`)
+      const response = await apiClient.get(`/client/cards/${cardId}/statistics?period=${period}`)
       return response.data
     } catch (error) {
       throw new Error("Impossible de récupérer les statistiques")
