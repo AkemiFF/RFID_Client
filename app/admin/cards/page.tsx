@@ -42,21 +42,96 @@ export default function CardsPage() {
     formState: { errors },
   } = useForm()
 
+  // Fonction pour filtrer les cartes côté frontend
+  const filterCartes = (cartes: CarteRFID[], filters: CarteFilters) => {
+    if (!cartes) return cartes
+
+    return cartes.filter((carte) => {
+      // Filtre par statut
+      if (filters.statut && carte.statut !== filters.statut) {
+        return false
+      }
+
+      // Filtre par type de carte
+      if (filters.type_carte && carte.type_carte !== filters.type_carte) {
+        return false
+      }
+
+      // Filtre par assignation
+      if (filters.assignation) {
+        const isAssigned = carte.personne || carte.entreprise
+        if (filters.assignation === "assigned" && !isAssigned) {
+          return false
+        }
+        if (filters.assignation === "unassigned" && isAssigned) {
+          return false
+        }
+      }
+
+      // Filtre par recherche
+      if (filters.search) {
+        const searchTerm = filters.search.toLowerCase()
+        const searchableText = [
+          carte.numero_serie,
+          carte.code_uid,
+          carte.personne?.nom,
+          carte.personne?.prenom,
+          carte.personne?.email,
+          carte.entreprise?.raison_sociale,
+          carte.entreprise?.email,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+
+        if (!searchableText.includes(searchTerm)) {
+          return false
+        }
+      }
+
+      return true
+    })
+  }
+
   const handleCreateCard = async (data: any) => {
     try {
-      await cartesService.createCarte({
+      // Vérifier s'il y a une assignation
+      const hasAssignment = data.personne || data.entreprise
+
+      const cardData = {
         ...data,
+        // Champs financiers avec valeurs par défaut
         plafond_quotidien: Number.parseFloat(data.plafond_quotidien) || 1000,
         plafond_mensuel: Number.parseFloat(data.plafond_mensuel) || 5000,
         solde_maximum: Number.parseFloat(data.solde_maximum) || 10000,
+
+        // Champs requis générés automatiquement
+        code_uid: `UID_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        numero_serie: `CARD_${Date.now()}_${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+        version_securite: "v1.0",
+        cle_chiffrement: `KEY_${Math.random().toString(36).substr(2, 32)}`,
+
+        // Statut par défaut INACTIVE, ACTIVE seulement si assignée
+        statut: hasAssignment ? "ACTIVE" : "INACTIVE",
+
+        // Autres champs
         lieu_emission: "Agence principale",
-      })
-      toast.success("Carte créée avec succès")
+
+        // Nettoyer les champs vides pour éviter les erreurs
+        personne: data.personne || null,
+        entreprise: data.entreprise || null,
+      }
+
+      await cartesService.createCarte(cardData)
+      toast.success(`Carte créée avec succès ${hasAssignment ? "et activée" : "(statut: inactive)"}`)
       setIsCreateModalOpen(false)
       reset()
       refetch()
-    } catch (error) {
-      toast.error("Erreur lors de la création de la carte")
+    } catch (error: any) {
+      console.error("Erreur lors de la création:", error)
+      const errorMessage =
+        error.response?.data?.detail || error.response?.data?.message || "Erreur lors de la création de la carte"
+      toast.error(errorMessage)
     }
   }
 
@@ -106,6 +181,9 @@ export default function CardsPage() {
     }
   }
 
+  // Appliquer les filtres aux cartes
+  const filteredCartes = filterCartes(cartes?.results || [], filters)
+
   return (
     <Layout searchPlaceholder="Rechercher des cartes...">
       <div className="animate-fade-in">
@@ -135,6 +213,7 @@ export default function CardsPage() {
               >
                 <option value="">Tous les statuts</option>
                 <option value="ACTIVE">Actif</option>
+                <option value="INACTIVE">Inactif</option>
                 <option value="BLOQUEE">Bloquée</option>
                 <option value="EXPIREE">Expirée</option>
                 <option value="PERDUE">Perdue</option>
@@ -155,6 +234,18 @@ export default function CardsPage() {
               </select>
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Assignation</label>
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                value={filters.assignation || ""}
+                onChange={(e) => setFilters({ ...filters, assignation: e.target.value || undefined })}
+              >
+                <option value="">Toutes les cartes</option>
+                <option value="assigned">Cartes assignées</option>
+                <option value="unassigned">Cartes non assignées</option>
+              </select>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Recherche</label>
               <input
                 type="text"
@@ -172,6 +263,11 @@ export default function CardsPage() {
                 Réinitialiser
               </button>
             </div>
+          </div>
+
+          {/* Affichage du nombre de résultats filtrés */}
+          <div className="mt-3 text-sm text-gray-600">
+            {filteredCartes.length} carte(s) trouvée(s) sur {cartes?.results?.length || 0} au total
           </div>
         </div>
 
@@ -212,7 +308,7 @@ export default function CardsPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {cartes?.results?.map((carte: CarteRFID) => (
+                    {filteredCartes.map((carte: CarteRFID) => (
                       <tr key={carte.id} className="hover:bg-gray-50 transition">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
@@ -238,11 +334,15 @@ export default function CardsPage() {
                                 : "Non assigné"}
                           </div>
                           <div className="text-sm text-gray-500">
-                            {carte.personne?.email || carte.entreprise?.email || ""}
+                            {carte.personne?.email || carte.entreprise?.email || (
+                              <span className="italic text-gray-400">En attente d'assignation</span>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-medium text-gray-900">€{carte.solde.toFixed(2)}</span>
+                          <span className="text-sm font-medium text-gray-900">
+                            €{Number(carte.solde || 0).toFixed(2)}
+                          </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
@@ -262,10 +362,23 @@ export default function CardsPage() {
                             <button
                               onClick={() => setSelectedCard(carte)}
                               className="text-blue-600 hover:text-blue-900"
+                              title="Voir les détails"
                             >
                               <EyeIcon className="h-5 w-5" />
                             </button>
-                            <button className="text-purple-600 hover:text-purple-900">
+                            {!carte.personne && !carte.entreprise && (
+                              <button className="text-green-600 hover:text-green-900" title="Assigner à une personne">
+                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                                  />
+                                </svg>
+                              </button>
+                            )}
+                            <button className="text-purple-600 hover:text-purple-900" title="Modifier">
                               <PencilIcon className="h-5 w-5" />
                             </button>
                             {carte.statut === "ACTIVE" ? (
@@ -380,23 +493,30 @@ export default function CardsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Personne</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Personne (optionnel)
+              <span className="text-xs text-gray-500 font-normal ml-2">- Peut être assignée ultérieurement</span>
+            </label>
             <select
               {...register("personne")}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
             >
-              <option value="">Sélectionnez une personne</option>
+              <option value="">Aucune assignation pour le moment</option>
               {personnes?.results?.map((personne: any) => (
                 <option key={personne.id} value={personne.id}>
                   {personne.prenom} {personne.nom} ({personne.email})
                 </option>
               ))}
             </select>
+            <p className="mt-1 text-xs text-gray-500">
+              Si aucune personne n'est sélectionnée, la carte sera créée avec le statut "Inactive" et devra être
+              assignée avant activation.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Plafond quotidien (€)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Plafond quotidien (Ar)</label>
               <input
                 type="number"
                 step="0.01"
@@ -406,7 +526,7 @@ export default function CardsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Plafond mensuel (€)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Plafond mensuel (Ar)</label>
               <input
                 type="number"
                 step="0.01"
@@ -481,15 +601,17 @@ export default function CardsPage() {
                 <dl className="space-y-3">
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Solde actuel</dt>
-                    <dd className="text-sm text-gray-900 font-semibold">€{selectedCard.solde.toFixed(2)}</dd>
+                    <dd className="text-sm text-gray-900 font-semibold">
+                      €{Number(selectedCard.solde || 0).toFixed(2)}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Plafond quotidien</dt>
-                    <dd className="text-sm text-gray-900">€{selectedCard.plafond_quotidien.toFixed(2)}</dd>
+                    <dd className="text-sm text-gray-900">€{Number(selectedCard.plafond_quotidien || 0).toFixed(2)}</dd>
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Plafond mensuel</dt>
-                    <dd className="text-sm text-gray-900">€{selectedCard.plafond_mensuel.toFixed(2)}</dd>
+                    <dd className="text-sm text-gray-900">€{Number(selectedCard.plafond_mensuel || 0).toFixed(2)}</dd>
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Nombre de transactions</dt>
@@ -526,7 +648,15 @@ export default function CardsPage() {
                   </div>
                 </dl>
               ) : (
-                <p className="text-sm text-gray-500">Aucun titulaire assigné</p>
+                <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
+                  <p className="text-sm text-gray-800">
+                    <strong>Aucun titulaire assigné</strong>
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Cette carte est inactive et doit être assignée à une personne ou une entreprise avant d'être
+                    activée.
+                  </p>
+                </div>
               )}
             </div>
 
@@ -554,6 +684,10 @@ export default function CardsPage() {
                     setSelectedCard(null)
                   }}
                   className="px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700"
+                  disabled={!selectedCard.personne && !selectedCard.entreprise}
+                  title={
+                    !selectedCard.personne && !selectedCard.entreprise ? "Assignez d'abord la carte à une personne" : ""
+                  }
                 >
                   Activer la carte
                 </button>

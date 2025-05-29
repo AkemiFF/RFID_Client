@@ -106,7 +106,7 @@ export const getAdminToken = async (): Promise<string | null> => {
     if (!isAdminAuthenticated()) {
         token = await refreshAdminToken();
     } else {
-        token = getAdminAccessToken();
+        token = getAdminAccessToken();  
     }
     return token;
 };

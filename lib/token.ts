@@ -68,7 +68,7 @@ export const refreshToken = async (): Promise<string> => {
     // Mettre à jour uniquement le token d'accès dans localStorage
     const authData = JSON.parse(localStorage.getItem('auth') || '{}');
     authData.access = data.access;
-    authData.access_expires_a = newAccessExpiresAt;
+    authData.access_expires_at = newAccessExpiresAt;
     localStorage.setItem('auth', JSON.stringify(authData));
 
     return data.access;
