@@ -1,16 +1,27 @@
 // auth.ts
-import { refreshAdminToken, refreshToken } from "./api"; // Assurez-vous d'avoir une fonction refreshAdminToken dans votre API
+import { jwtDecode } from 'jwt-decode';
+import { refreshAdminToken, refreshToken } from "./token"; // Assurez-vous d'avoir une fonction refreshAdminToken dans votre API
 
-interface AuthData {
-    access: string;
-    refresh: string;
-    user_id: number;
-    username: string;
-    email: string;
-    role: string;
-    access_expires_at: number;
+interface User {
+    id: string
+    username: string
+    email: string
+    first_name: string
+    last_name: string
+    role: string
+    region_assignee: string
+    actif: boolean
+    derniere_connexion: string
+    permissions: string[]
+    roles: string[]
 }
 
+interface AuthData {
+    access: string
+    refresh: string
+    user: User
+    access_expires_at: number
+}
 interface AdminAuthData {
     access: string;
     refresh: string;
@@ -20,21 +31,27 @@ interface AdminAuthData {
     role: string;
     access_expires_at: number;
 }
+type JwtPayload = {
+    exp: number
+}
+export const saveAuthData = (responseData: {
+    access: string
+    refresh: string
+    user: User
+}) => {
+    const { access, refresh, user } = responseData
 
-// Fonctions pour l'authentification des utilisateurs normaux
-export const saveAuthData = (responseData: any) => {
+    const { exp } = jwtDecode<JwtPayload>(access)
+
     const authData: AuthData = {
-        access: responseData.access,
-        refresh: responseData.refresh,
-        user_id: responseData.user_id,
-        username: responseData.username,
-        email: responseData.email,
-        role: responseData.role,
-        access_expires_at: Date.now() + (parseInt(responseData.token_lifetime.access) * 1000)
-    };
+        access,
+        refresh,
+        user,
+        access_expires_at: exp * 1000,
+    }
 
-    localStorage.setItem('auth', JSON.stringify(authData));
-};
+    localStorage.setItem('auth', JSON.stringify(authData))
+}
 
 export const getAccessToken = (): string | null => {
     const auth = localStorage.getItem('auth');
@@ -89,7 +106,7 @@ export const getAdminToken = async (): Promise<string | null> => {
     if (!isAdminAuthenticated()) {
         token = await refreshAdminToken();
     } else {
-        token = getAdminAccessToken();
+        token = getAdminAccessToken();  
     }
     return token;
 };
@@ -108,15 +125,16 @@ export const getAuthHeaderFormData = async (): Promise<HeadersInit> => {
 
 // Fonctions pour l'authentification des administrateurs
 export const saveAdminAuthData = (responseData: any) => {
-    const adminAuthData: AdminAuthData = {
-        access: responseData.access,
-        refresh: responseData.refresh,
-        admin_id: responseData.admin_id,
-        username: responseData.username,
-        email: responseData.email,
-        role: responseData.role,
-        access_expires_at: Date.now() + (parseInt(responseData.token_lifetime.access) * 1000)
-    };
+    const { access, refresh, user } = responseData
+
+    const { exp } = jwtDecode<JwtPayload>(access)
+
+    const adminAuthData: AuthData = {
+        access,
+        refresh,
+        user,
+        access_expires_at: exp * 1000,
+    }
 
     localStorage.setItem('admin_auth', JSON.stringify(adminAuthData));
 };

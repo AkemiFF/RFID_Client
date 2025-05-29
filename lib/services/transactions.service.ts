@@ -1,4 +1,5 @@
 import api from "../api"
+import { apiAdmin } from "../api-service"
 
 export interface Transaction {
   id: string
@@ -49,7 +50,7 @@ export interface TransactionFilters {
 
 class TransactionsService {
   async getTransactions(filters: TransactionFilters = {}) {
-    const response = await api.get("/transactions/transactions/", { params: filters })
+    const response = await apiAdmin.get("/transactions/transactions/", { params: filters })
     return response.data
   }
 
@@ -69,7 +70,7 @@ class TransactionsService {
   }
 
   async getRechargements(filters: any = {}) {
-    const response = await api.get("/transactions/rechargements/", { params: filters })
+    const response = await apiAdmin.get("/transactions/rechargements/", { params: filters })
     return response.data
   }
 
