@@ -26,6 +26,7 @@ import {
   RotateCcw,
   ChevronLeft,
   ChevronRight,
+  Loader2,
 } from "lucide-react"
 import { transactionsService, type Transaction, type TransactionFilters } from "@/lib/services/transactions.service"
 
@@ -207,13 +208,115 @@ export default function TransactionsPage() {
     }))
   }
 
+  const [exporting, setExporting] = useState(false);
+
   const exportTransactions = async () => {
     try {
-      console.log("Exporting transactions...")
+      setExporting(true);
+
+      const allTransactions = await transactionsService.getTransactions({
+        ...filters,
+        page_size: 10000,
+        page: 1,
+      });
+
+      const transactionsToExport = allTransactions.results || allTransactions;
+
+      if (transactionsToExport.length === 0) {
+        alert("Aucune transaction à exporter");
+        return;
+      }
+
+      // Créer les en-têtes CSV
+      const headers = [
+        "ID Transaction",
+        "Référence",
+        "Date",
+        "Heure",
+        "Type",
+        "Montant",
+        "Statut",
+        "Carte",
+        "Client",
+        "Commerçant",
+        "Catégorie",
+        "Localisation",
+        "Frais",
+        "Solde avant",
+        "Solde après"
+      ];
+      // Créer les lignes de données
+
+      interface ExportTransactionRow {
+        id: string;
+        reference_interne: string;
+        date: string;
+        time: string;
+        type: string;
+        montant: number | string;
+        statut: string;
+        carte: string;
+        client: string;
+        merchant_nom: string;
+        categorie: string;
+        localisation: string;
+        frais_transaction: number | string;
+        solde_avant: number | string;
+        solde_apres: number | string;
+      }
+
+      const rows: ExportTransactionRow[] = transactionsToExport.map((transaction: Transaction) => ({
+        id: transaction.id,
+        reference_interne: transaction.reference_interne,
+        date: formatDate(transaction.date_transaction),
+        time: formatTime(transaction.date_transaction),
+        type: typeConfig[transaction.type_transaction].label,
+        montant: transaction.montant,
+        statut: statusConfig[transaction.statut].label,
+        carte: `••••${getCardLastFour(transaction.carte)}`,
+        client: `Client#${transaction.carte.slice(0, 8)}`,
+        merchant_nom: transaction.merchant_nom || "N/A",
+        categorie: transaction.categorie || "N/A",
+        localisation: transaction.localisation || "N/A",
+        frais_transaction: transaction.frais_transaction,
+        solde_avant: transaction.solde_avant,
+        solde_apres: transaction.solde_apres,
+      }));
+
+      // Créer le contenu CSV
+      const csvContent = [
+        headers.join(";"),
+        ...rows.map(row => Object.values(row).join(";"))
+      ].join("\n");
+
+      // Créer un blob et déclencher le téléchargement
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `transactions_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
     } catch (error) {
-      console.error("Erreur lors de l'export:", error)
+      console.error("Erreur lors de l'export:", error);
+      alert("Une erreur est survenue lors de l'export");
+    } finally {
+      setExporting(false);
     }
-  }
+  };
+
+  // Modifier le bouton pour afficher l'état de chargement
+  <Button variant="outline" onClick={exportTransactions} disabled={exporting}>
+    {exporting ? (
+      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+    ) : (
+      <Download className="h-4 w-4 mr-2" />
+    )}
+    {exporting ? "Export en cours..." : "Exporter"}
+  </Button>
 
   const formatAmount = (amount: number | string) => {
     const amountNumber = typeof amount === 'string' ? parseFloat(amount) : amount
