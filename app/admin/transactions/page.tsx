@@ -542,6 +542,7 @@ export default function TransactionsPage() {
                     <TableHead>ID Transaction</TableHead>
                     <TableHead>Date & Heure</TableHead>
                     <TableHead>Carte / Client</TableHead>
+                    <TableHead>Carte récepteur / Client récepteur</TableHead>
                     <TableHead>Commerçant</TableHead>
                     <TableHead>Montant</TableHead>
                     <TableHead>Statut</TableHead>
@@ -552,6 +553,9 @@ export default function TransactionsPage() {
                   {loading ? (
                     Array.from({ length: 5 }).map((_, index) => (
                       <TableRow key={index}>
+                        <TableCell>
+                          <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                        </TableCell>
                         <TableCell>
                           <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
                         </TableCell>
@@ -611,6 +615,27 @@ export default function TransactionsPage() {
                                   •••• {getCardLastFour(transaction.carte)}
                                 </div>
                                 <div className="text-sm text-gray-500">Client #{transaction.carte.slice(0, 8)}</div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center">
+                              <div className="h-10 w-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 mr-3">
+                                <CreditCard className="h-4 w-4" />
+                              </div>
+                              <div>
+                                {transaction.carte_receipt ? (
+                                  <>
+                                    <div className="text-sm font-medium text-gray-900">
+                                      •••• {getCardLastFour(transaction.carte_receipt)}
+                                    </div>
+                                    <div className="text-sm text-gray-500">
+                                      Client #{transaction.carte_receipt.slice(0, 8)}
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="text-sm text-gray-500">N/A</div>
+                                )}
                               </div>
                             </div>
                           </TableCell>
@@ -688,7 +713,7 @@ export default function TransactionsPage() {
                                           </div>
                                           <div>
                                             <div className="text-sm font-medium text-gray-900">
-                                              •••• •••• •••• {getCardLastFour(selectedTransaction.carte)}
+                                              {selectedTransaction.carte}
                                             </div>
                                             <div className="text-sm text-gray-500">
                                               Solde avant: {formatAmount(selectedTransaction.solde_avant)}
@@ -699,6 +724,26 @@ export default function TransactionsPage() {
                                           </div>
                                         </div>
                                       </div>
+                                      {selectedTransaction.carte_receipt && (
+                                        <div className="border-t pt-4">
+                                          <h4 className="text-md font-medium text-gray-900 mb-3">
+                                            Informations carte réceptrice
+                                          </h4>
+                                          <div className="flex items-center">
+                                            <div className="h-10 w-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 mr-4">
+                                              <CreditCard className="h-4 w-4" />
+                                            </div>
+                                            <div>
+                                              <div className="text-sm font-medium text-gray-900">
+                                                {selectedTransaction.carte_receipt}
+                                              </div>
+                                              <div className="text-sm text-gray-500">
+                                                Client #{selectedTransaction.carte_receipt.slice(0, 8)}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
 
                                       {selectedTransaction.merchant_nom && (
                                         <div className="border-t pt-4">
