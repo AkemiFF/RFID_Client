@@ -1,568 +1,503 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import {
-  CalendarIcon,
-  SearchIcon,
-  DownloadIcon,
-  ArrowUpIcon,
-  ArrowDownIcon,
-  RefreshCwIcon,
-  CreditCardIcon,
-  SendIcon,
-  PlusIcon,
-  MinusIcon,
-  EyeIcon,
-  MoreHorizontalIcon,
-} from "lucide-react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { clientPaymentService, type HistoryFilters, type Transaction } from "@/lib/services/client-payment.service"
+import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
-
-interface Transaction {
-  id: string
-  date: string
-  type: "paiement" | "transfert_envoye" | "transfert_recu" | "depot" | "retrait" | "remboursement"
-  montant: number
-  description: string
-  reference: string
-  statut: "reussie" | "echouee" | "en_attente" | "annulee"
-  commercant?: string
-  destinataire?: string
-  expediteur?: string
-  carteUtilisee?: string
-  frais: number
-  soldeApres: number
-  canal: "rfid" | "qr" | "mobile" | "web"
-  localisation?: string
-}
+import {
+  Activity,
+  CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  CreditCard,
+  FileDown,
+  Filter,
+  MoreHorizontal,
+  Receipt,
+  RefreshCw,
+  Search,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react"
+import { useEffect, useState } from "react"
 
 interface TransactionStats {
   totalTransactions: number
   totalDepenses: number
   totalRecus: number
   transactionsMoyennes: number
-  periodeActive: string
 }
 
-export default function ClientHistory() {
+export default function HistoryPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([])
-  const [stats, setStats] = useState<TransactionStats | null>(null)
+  const [stats, setStats] = useState<TransactionStats>({
+    totalTransactions: 0,
+    totalDepenses: 0,
+    totalRecus: 0,
+    transactionsMoyennes: 0,
+  })
   const [loading, setLoading] = useState(true)
+  const [pagination, setPagination] = useState({
+    page: 1,
+    totalPages: 1,
+    total: 0,
+  })
+
+  // Filtres
+  const [filters, setFilters] = useState<HistoryFilters>({
+    page: 1,
+    limit: 20,
+  })
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedType, setSelectedType] = useState<string>("all")
-  const [selectedStatus, setSelectedStatus] = useState<string>("all")
-  const [selectedPeriod, setSelectedPeriod] = useState<string>("30")
-  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({})
-  const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(20)
+  const [dateRange, setDateRange] = useState<{
+    from?: Date
+    to?: Date
+  }>({})
+  const [selectedPeriod, setSelectedPeriod] = useState("30d")
+
+  // États pour les actions
+  const [exporting, setExporting] = useState(false)
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
 
   useEffect(() => {
-    loadTransactions()
-  }, [selectedPeriod, dateRange])
+    loadHistory()
+  }, [filters])
 
-  useEffect(() => {
-    filterTransactions()
-  }, [transactions, searchTerm, selectedType, selectedStatus])
-
-  const loadTransactions = async () => {
-    setLoading(true)
+  const loadHistory = async () => {
     try {
-      // Simulation des données - remplacer par l'appel API réel
-      const mockTransactions: Transaction[] = [
-        {
-          id: "TXN001",
-          date: "2024-01-27T14:30:00Z",
-          type: "paiement",
-          montant: 15000,
-          description: "Achat supermarché",
-          reference: "PAY-2024-001",
-          statut: "reussie",
-          commercant: "SuperMarché Plus",
-          carteUtilisee: "•••• 1234",
-          frais: 0,
-          soldeApres: 85000,
-          canal: "rfid",
-          localisation: "Antananarivo",
-        },
-        {
-          id: "TXN002",
-          date: "2024-01-27T10:15:00Z",
-          type: "depot",
-          montant: 50000,
-          description: "Rechargement carte",
-          reference: "DEP-2024-001",
-          statut: "reussie",
-          carteUtilisee: "•••• 1234",
-          frais: 0,
-          soldeApres: 100000,
-          canal: "mobile",
-        },
-        {
-          id: "TXN003",
-          date: "2024-01-26T19:45:00Z",
-          type: "paiement",
-          montant: 8500,
-          description: "Restaurant",
-          reference: "PAY-2024-002",
-          statut: "reussie",
-          commercant: "Chez Marie",
-          carteUtilisee: "•••• 1234",
-          frais: 0,
-          soldeApres: 50000,
-          canal: "qr",
-          localisation: "Antananarivo",
-        },
-        {
-          id: "TXN004",
-          date: "2024-01-26T08:20:00Z",
-          type: "transfert_envoye",
-          montant: 25000,
-          description: "Transfert à Jean",
-          reference: "TRF-2024-001",
-          statut: "reussie",
-          destinataire: "Jean Rakoto (+261 34 12 345 67)",
-          carteUtilisee: "•••• 1234",
-          frais: 250,
-          soldeApres: 58500,
-          canal: "mobile",
-        },
-        {
-          id: "TXN005",
-          date: "2024-01-25T16:30:00Z",
-          type: "transfert_recu",
-          montant: 30000,
-          description: "Transfert de Marie",
-          reference: "TRF-2024-002",
-          statut: "reussie",
-          expediteur: "Marie Rabe (+261 33 98 765 43)",
-          carteUtilisee: "•••• 1234",
-          frais: 0,
-          soldeApres: 83750,
-          canal: "mobile",
-        },
-        {
-          id: "TXN006",
-          date: "2024-01-25T11:15:00Z",
-          type: "paiement",
-          montant: 12000,
-          description: "Pharmacie",
-          reference: "PAY-2024-003",
-          statut: "echouee",
-          commercant: "Pharmacie Centrale",
-          carteUtilisee: "•••• 1234",
-          frais: 0,
-          soldeApres: 53750,
-          canal: "rfid",
-          localisation: "Antananarivo",
-        },
-        {
-          id: "TXN007",
-          date: "2024-01-24T14:00:00Z",
-          type: "retrait",
-          montant: 20000,
-          description: "Retrait DAB",
-          reference: "WTH-2024-001",
-          statut: "reussie",
-          carteUtilisee: "•••• 1234",
-          frais: 500,
-          soldeApres: 53750,
-          canal: "rfid",
-          localisation: "Antananarivo",
-        },
-      ]
-
-      setTransactions(mockTransactions)
-
-      // Calcul des statistiques
-      const totalDepenses = mockTransactions
-        .filter((t) => ["paiement", "transfert_envoye", "retrait"].includes(t.type) && t.statut === "reussie")
-        .reduce((sum, t) => sum + t.montant + t.frais, 0)
-
-      const totalRecus = mockTransactions
-        .filter((t) => ["depot", "transfert_recu", "remboursement"].includes(t.type) && t.statut === "reussie")
-        .reduce((sum, t) => sum + t.montant, 0)
-
-      setStats({
-        totalTransactions: mockTransactions.length,
-        totalDepenses,
-        totalRecus,
-        transactionsMoyennes: mockTransactions.length > 0 ? Math.round(totalDepenses / mockTransactions.length) : 0,
-        periodeActive: "30 derniers jours",
+      setLoading(true)
+      const response = await clientPaymentService.getDetailedHistory(filters)
+      setTransactions(response.transactions)
+      setStats(response.stats)
+      setPagination({
+        page: response.page,
+        totalPages: response.totalPages,
+        total: response.total,
       })
     } catch (error) {
-      console.error("Erreur lors du chargement des transactions:", error)
+      console.error("Erreur lors du chargement de l'historique:", error)
     } finally {
       setLoading(false)
     }
   }
 
-  const filterTransactions = () => {
-    let filtered = transactions
-
-    // Filtre par recherche
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (t) =>
-          t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          t.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          t.commercant?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          t.destinataire?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          t.expediteur?.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
-    }
-
-    // Filtre par type
-    if (selectedType !== "all") {
-      filtered = filtered.filter((t) => t.type === selectedType)
-    }
-
-    // Filtre par statut
-    if (selectedStatus !== "all") {
-      filtered = filtered.filter((t) => t.statut === selectedStatus)
-    }
-
-    setFilteredTransactions(filtered)
-    setCurrentPage(1)
+  const handleSearch = (value: string) => {
+    setSearchTerm(value)
+    setFilters((prev) => ({ ...prev, search: value, page: 1 }))
   }
 
-  const getTransactionIcon = (type: string) => {
-    switch (type) {
-      case "paiement":
-        return <CreditCardIcon className="h-4 w-4" />
-      case "transfert_envoye":
-        return <SendIcon className="h-4 w-4" />
-      case "transfert_recu":
-        return <ArrowDownIcon className="h-4 w-4" />
-      case "depot":
-        return <PlusIcon className="h-4 w-4" />
-      case "retrait":
-        return <MinusIcon className="h-4 w-4" />
-      case "remboursement":
-        return <RefreshCwIcon className="h-4 w-4" />
+  const handleTypeFilter = (type: string) => {
+    setFilters((prev) => ({ ...prev, type: type === "all" ? undefined : type, page: 1 }))
+  }
+
+  const handleStatusFilter = (status: string) => {
+    setFilters((prev) => ({ ...prev, status: status === "all" ? undefined : status, page: 1 }))
+  }
+
+  const handleDateRangeChange = () => {
+    if (dateRange.from) {
+      setFilters((prev) => ({
+        ...prev,
+        dateFrom: dateRange.from?.toISOString(),
+        dateTo: dateRange.to?.toISOString(),
+        page: 1,
+      }))
+    }
+  }
+
+  const handlePeriodChange = (period: string) => {
+    setSelectedPeriod(period)
+    const now = new Date()
+    let from: Date
+
+    switch (period) {
+      case "7d":
+        from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        break
+      case "30d":
+        from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        break
+      case "90d":
+        from = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+        break
+      case "1y":
+        from = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000)
+        break
       default:
-        return <CreditCardIcon className="h-4 w-4" />
+        return
+    }
+
+    setDateRange({ from, to: now })
+    setFilters((prev) => ({
+      ...prev,
+      dateFrom: from.toISOString(),
+      dateTo: now.toISOString(),
+      page: 1,
+    }))
+  }
+
+  const handlePageChange = (newPage: number) => {
+    setFilters((prev) => ({ ...prev, page: newPage }))
+  }
+
+  const handleExport = async (fileFormat: "csv" | "pdf" | "excel") => {
+    try {
+      setExporting(true)
+      const blob = await clientPaymentService.exportTransactions(fileFormat, {
+        type: filters.type,
+        status: filters.status,
+        dateFrom: filters.dateFrom,
+        dateTo: filters.dateTo,
+      })
+
+      const filename = `transactions_${fileFormat}_${format(new Date(), "yyyy-MM-dd")}.${fileFormat}`
+      clientPaymentService.downloadFile(blob, filename)
+    } catch (error) {
+      console.error("Erreur lors de l'export:", error)
+    } finally {
+      setExporting(false)
     }
   }
 
-  const getTransactionColor = (type: string) => {
-    switch (type) {
-      case "paiement":
-        return "text-red-600"
-      case "transfert_envoye":
-        return "text-orange-600"
-      case "transfert_recu":
-        return "text-green-600"
-      case "depot":
-        return "text-green-600"
-      case "retrait":
-        return "text-red-600"
-      case "remboursement":
-        return "text-blue-600"
-      default:
-        return "text-gray-600"
+  const handleDownloadReceipt = async (transactionId: string) => {
+    try {
+      const blob = await clientPaymentService.getTransactionReceipt(transactionId)
+      const filename = `recu_${transactionId}.pdf`
+      clientPaymentService.downloadFile(blob, filename)
+    } catch (error) {
+      console.error("Erreur lors du téléchargement du reçu:", error)
     }
   }
 
-  const getStatusBadge = (statut: string) => {
-    const variants = {
-      reussie: "bg-green-100 text-green-800",
-      echouee: "bg-red-100 text-red-800",
-      en_attente: "bg-yellow-100 text-yellow-800",
-      annulee: "bg-gray-100 text-gray-800",
-    }
-
-    const labels = {
-      reussie: "Réussie",
-      echouee: "Échouée",
-      en_attente: "En attente",
-      annulee: "Annulée",
-    }
-
-    return <Badge className={variants[statut as keyof typeof variants]}>{labels[statut as keyof typeof labels]}</Badge>
+  const resetFilters = () => {
+    setFilters({ page: 1, limit: 20 })
+    setSearchTerm("")
+    setDateRange({})
+    setSelectedPeriod("30d")
   }
 
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat("fr-FR").format(amount) + " Ar"
-  }
-
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), "dd/MM/yyyy HH:mm", { locale: fr })
-  }
-
-  const exportTransactions = () => {
-    // Logique d'export - peut être CSV, PDF, etc.
-    console.log("Export des transactions")
-  }
-
-  // Pagination
-  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const currentTransactions = filteredTransactions.slice(startIndex, endIndex)
-
-  if (loading) {
+  if (loading && transactions.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <RefreshCw className="h-8 w-8 animate-spin" />
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+    <div className="container mx-auto p-6 space-y-6">
+      {/* En-tête */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Historique des transactions</h1>
-          <p className="text-gray-600">Consultez toutes vos opérations</p>
+          <h1 className="text-3xl font-bold">Historique des transactions</h1>
+          <p className="text-muted-foreground">Consultez et gérez toutes vos transactions</p>
         </div>
-        <Button onClick={exportTransactions} variant="outline">
-          <DownloadIcon className="h-4 w-4 mr-2" />
-          Exporter
-        </Button>
+
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={exporting}>
+                <FileDown className="h-4 w-4 mr-2" />
+                Exporter
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => handleExport("csv")}>Export CSV</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport("pdf")}>Export PDF</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport("excel")}>Export Excel</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button variant="outline" onClick={loadHistory}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Actualiser
+          </Button>
+        </div>
       </div>
 
       {/* Statistiques */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total transactions</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalTransactions}</p>
-                </div>
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                  <CreditCardIcon className="h-5 w-5 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalTransactions}</div>
+            <p className="text-xs text-muted-foreground">Sur la période sélectionnée</p>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total dépensé</p>
-                  <p className="text-2xl font-bold text-red-600">{formatAmount(stats.totalDepenses)}</p>
-                </div>
-                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                  <ArrowUpIcon className="h-5 w-5 text-red-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Dépensé</CardTitle>
+            <TrendingDown className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              {clientPaymentService.formatAmount(stats.totalDepenses)}
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total reçu</p>
-                  <p className="text-2xl font-bold text-green-600">{formatAmount(stats.totalRecus)}</p>
-                </div>
-                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                  <ArrowDownIcon className="h-5 w-5 text-green-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Reçu</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {clientPaymentService.formatAmount(stats.totalRecus)}
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Moyenne/transaction</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatAmount(stats.transactionsMoyennes)}</p>
-                </div>
-                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                  <RefreshCwIcon className="h-5 w-5 text-purple-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Moyenne</CardTitle>
+            <CreditCard className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{clientPaymentService.formatAmount(stats.transactionsMoyennes)}</div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Filtres */}
       <Card>
-        <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filtres
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Recherche */}
-            <div className="relative">
-              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Rechercher..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Recherche</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher..."
+                  value={searchTerm}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
             </div>
 
             {/* Type de transaction */}
-            <Select value={selectedType} onValueChange={setSelectedType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les types</SelectItem>
-                <SelectItem value="paiement">Paiements</SelectItem>
-                <SelectItem value="transfert_envoye">Transferts envoyés</SelectItem>
-                <SelectItem value="transfert_recu">Transferts reçus</SelectItem>
-                <SelectItem value="depot">Dépôts</SelectItem>
-                <SelectItem value="retrait">Retraits</SelectItem>
-                <SelectItem value="remboursement">Remboursements</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Type</label>
+              <Select onValueChange={handleTypeFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tous les types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les types</SelectItem>
+                  <SelectItem value="ACHAT">Paiements</SelectItem>
+                  <SelectItem value="TRANSFERT">Transferts</SelectItem>
+                  <SelectItem value="RECHARGE">Dépôts</SelectItem>
+                  <SelectItem value="RETRAIT">Retraits</SelectItem>
+                  <SelectItem value="REMBOURSEMENT">Remboursements</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* Statut */}
-            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger>
-                <SelectValue placeholder="Statut" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="reussie">Réussie</SelectItem>
-                <SelectItem value="echouee">Échouée</SelectItem>
-                <SelectItem value="en_attente">En attente</SelectItem>
-                <SelectItem value="annulee">Annulée</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Statut</label>
+              <Select onValueChange={handleStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tous les statuts" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les statuts</SelectItem>
+                  <SelectItem value="VALIDEE">Réussie</SelectItem>
+                  <SelectItem value="ECHOUEE">Échouée</SelectItem>
+                  <SelectItem value="EN_COURS">En attente</SelectItem>
+                  <SelectItem value="ANNULEE">Annulée</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* Période */}
-            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-              <SelectTrigger>
-                <SelectValue placeholder="Période" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">7 derniers jours</SelectItem>
-                <SelectItem value="30">30 derniers jours</SelectItem>
-                <SelectItem value="90">3 derniers mois</SelectItem>
-                <SelectItem value="365">12 derniers mois</SelectItem>
-                <SelectItem value="custom">Période personnalisée</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Date personnalisée */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="justify-start text-left font-normal">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateRange.from ? (
-                    dateRange.to ? (
-                      <>
-                        {format(dateRange.from, "dd/MM/yy")} - {format(dateRange.to, "dd/MM/yy")}
-                      </>
-                    ) : (
-                      format(dateRange.from, "dd/MM/yyyy")
-                    )
-                  ) : (
-                    "Choisir dates"
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  initialFocus
-                  mode="range"
-                  defaultMonth={dateRange.from}
-                  selected={dateRange}
-                  onSelect={setDateRange}
-                  numberOfMonths={2}
-                />
-              </PopoverContent>
-            </Popover>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Période</label>
+              <Select value={selectedPeriod} onValueChange={handlePeriodChange}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7d">7 derniers jours</SelectItem>
+                  <SelectItem value="30d">30 derniers jours</SelectItem>
+                  <SelectItem value="90d">3 derniers mois</SelectItem>
+                  <SelectItem value="1y">1 dernière année</SelectItem>
+                  <SelectItem value="custom">Personnalisée</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+
+          {/* Plage de dates personnalisée */}
+          {selectedPeriod === "custom" && (
+            <div className="mt-4 flex flex-col sm:flex-row gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Date de début</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dateRange.from && "text-muted-foreground",
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateRange.from ? format(dateRange.from, "PPP", { locale: fr }) : "Sélectionner une date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={dateRange.from}
+                      onSelect={(date) => setDateRange((prev) => ({ ...prev, from: date }))}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Date de fin</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dateRange.to && "text-muted-foreground",
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateRange.to ? format(dateRange.to, "PPP", { locale: fr }) : "Sélectionner une date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={dateRange.to}
+                      onSelect={(date) => setDateRange((prev) => ({ ...prev, to: date }))}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="flex items-end gap-2">
+                <Button onClick={handleDateRangeChange}>Appliquer</Button>
+                <Button variant="outline" onClick={resetFilters}>
+                  Réinitialiser
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       {/* Liste des transactions */}
       <Card>
         <CardHeader>
-          <CardTitle>Transactions ({filteredTransactions.length})</CardTitle>
-          <CardDescription>
-            Affichage de {startIndex + 1} à {Math.min(endIndex, filteredTransactions.length)} sur{" "}
-            {filteredTransactions.length} transactions
-          </CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Transactions</CardTitle>
+              <CardDescription>{pagination.total} transaction(s) trouvée(s)</CardDescription>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {currentTransactions.map((transaction) => (
-              <div
-                key={transaction.id}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center space-x-4">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-gray-100`}>
-                    <div className={getTransactionColor(transaction.type)}>{getTransactionIcon(transaction.type)}</div>
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">{transaction.description}</p>
-                    <div className="flex items-center space-x-2 text-sm text-gray-500">
-                      <span>{transaction.reference}</span>
-                      <span>•</span>
-                      <span>{formatDate(transaction.date)}</span>
-                      {transaction.commercant && (
-                        <>
-                          <span>•</span>
-                          <span>{transaction.commercant}</span>
-                        </>
-                      )}
-                      {transaction.destinataire && (
-                        <>
-                          <span>•</span>
-                          <span>{transaction.destinataire}</span>
-                        </>
-                      )}
-                      {transaction.expediteur && (
-                        <>
-                          <span>•</span>
-                          <span>{transaction.expediteur}</span>
-                        </>
-                      )}
+            {transactions.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">Aucune transaction trouvée</p>
+              </div>
+            ) : (
+              transactions.map((transaction) => (
+                <div
+                  key={transaction.id}
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="text-2xl">
+                      {clientPaymentService.getTransactionIcon(transaction.type_transaction)}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-medium truncate">{transaction.type_display}</h3>
+                        <Badge className={clientPaymentService.getStatusColor(transaction.statut)}>
+                          {transaction.statut_display}
+                        </Badge>
+                      </div>
+
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <p>Réf: {transaction.reference_interne}</p>
+                        {transaction.merchant_nom && <p>Commerçant: {transaction.merchant_nom}</p>}
+                        {transaction.description && <p>Description: {transaction.description}</p>}
+                        <p>{clientPaymentService.formatDate(transaction.date_transaction)}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center space-x-4">
-                  <div className="text-right">
-                    <p className={`font-medium ${getTransactionColor(transaction.type)}`}>
-                      {["paiement", "transfert_envoye", "retrait"].includes(transaction.type) ? "-" : "+"}
-                      {formatAmount(transaction.montant)}
-                    </p>
-                    {transaction.frais > 0 && (
-                      <p className="text-sm text-gray-500">Frais: {formatAmount(transaction.frais)}</p>
+                  <div className="text-right space-y-2">
+                    <div
+                      className={cn(
+                        "text-lg font-semibold",
+                        clientPaymentService.getTransactionColor(transaction.type_transaction),
+                      )}
+                    >
+                      {transaction.type_transaction === "RECHARGE" ? "+" : "-"}
+                      {clientPaymentService.formatAmount(transaction.montant)}
+                    </div>
+
+                    {transaction.frais_transaction > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        Frais: {clientPaymentService.formatAmount(transaction.frais_transaction)}
+                      </div>
                     )}
-                  </div>
 
-                  <div className="flex items-center space-x-2">
-                    {getStatusBadge(transaction.statut)}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm">
-                          <MoreHorizontalIcon className="h-4 w-4" />
+                          <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <EyeIcon className="h-4 w-4 mr-2" />
+                        <DropdownMenuItem onClick={() => setSelectedTransaction(transaction)}>
                           Voir détails
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <DownloadIcon className="h-4 w-4 mr-2" />
+                        <DropdownMenuItem onClick={() => handleDownloadReceipt(transaction.id)}>
+                          <Receipt className="h-4 w-4 mr-2" />
                           Télécharger reçu
                         </DropdownMenuItem>
-                        {transaction.statut === "reussie" && transaction.type === "paiement" && (
-                          <DropdownMenuItem>
-                            <RefreshCwIcon className="h-4 w-4 mr-2" />
+                        {transaction.statut === "VALIDEE" && transaction.type_transaction === "ACHAT" && (
+                          <DropdownMenuItem
+                            onClick={() => {
+                              /* TODO: Implémenter demande de remboursement */
+                            }}
+                          >
                             Demander remboursement
                           </DropdownMenuItem>
                         )}
@@ -570,44 +505,123 @@ export default function ClientHistory() {
                     </DropdownMenu>
                   </div>
                 </div>
-              </div>
-            ))}
-
-            {currentTransactions.length === 0 && (
-              <div className="text-center py-8">
-                <p className="text-gray-500">Aucune transaction trouvée</p>
-              </div>
+              ))
             )}
           </div>
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-6">
-              <p className="text-sm text-gray-700">
-                Page {currentPage} sur {totalPages}
-              </p>
-              <div className="flex space-x-2">
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4">
+              <div className="text-sm text-muted-foreground">
+                Page {pagination.page} sur {pagination.totalPages}({pagination.total} total)
+              </div>
+
+              <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={pagination.page === 1}
                 >
+                  <ChevronLeft className="h-4 w-4" />
                   Précédent
                 </Button>
+
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage === totalPages}
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={pagination.page === pagination.totalPages}
                 >
                   Suivant
+                  <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Modal détails transaction */}
+      {selectedTransaction && (
+        <Dialog open={!!selectedTransaction} onOpenChange={() => setSelectedTransaction(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Détails de la transaction</DialogTitle>
+            </DialogHeader>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Référence</label>
+                <p className="font-mono">{selectedTransaction.reference_interne}</p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Type</label>
+                <p>{selectedTransaction.type_display}</p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Montant</label>
+                <p className="text-lg font-semibold">
+                  {clientPaymentService.formatAmount(selectedTransaction.montant)}
+                </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Statut</label>
+                <Badge className={clientPaymentService.getStatusColor(selectedTransaction.statut)}>
+                  {selectedTransaction.statut_display}
+                </Badge>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Date</label>
+                <p>{clientPaymentService.formatDate(selectedTransaction.date_transaction)}</p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Carte utilisée</label>
+                <p className="font-mono">**** {selectedTransaction.carte_numero.slice(-4)}</p>
+              </div>
+
+              {selectedTransaction.merchant_nom && (
+                <div className="col-span-2">
+                  <label className="text-sm font-medium text-muted-foreground">Commerçant</label>
+                  <p>{selectedTransaction.merchant_nom}</p>
+                </div>
+              )}
+
+              {selectedTransaction.description && (
+                <div className="col-span-2">
+                  <label className="text-sm font-medium text-muted-foreground">Description</label>
+                  <p>{selectedTransaction.description}</p>
+                </div>
+              )}
+
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Solde avant</label>
+                <p>{clientPaymentService.formatAmount(selectedTransaction.solde_avant)}</p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Solde après</label>
+                <p>{clientPaymentService.formatAmount(selectedTransaction.solde_apres)}</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setSelectedTransaction(null)}>
+                Fermer
+              </Button>
+              <Button onClick={() => handleDownloadReceipt(selectedTransaction.id)}>
+                <Receipt className="h-4 w-4 mr-2" />
+                Télécharger reçu
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }
