@@ -26,6 +26,7 @@ import {
   RotateCcw,
   ChevronLeft,
   ChevronRight,
+  Loader2,
 } from "lucide-react"
 import { transactionsService, type Transaction, type TransactionFilters } from "@/lib/services/transactions.service"
 
@@ -63,6 +64,17 @@ const typeConfig = {
   TRANSFERT: { label: "Transfert", color: "text-blue-600" },
 }
 
+interface Stats {
+  today: number
+  totalAmount: number
+  successRate: number
+  averageAmount: number
+  todayChange: number
+  amountChange: number
+  rateChange: number
+  avgChange: number
+}
+
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
@@ -72,38 +84,118 @@ export default function TransactionsPage() {
     page_size: 10,
   })
   const [searchTerm, setSearchTerm] = useState("")
-  const [stats, setStats] = useState({
-    today: 142,
-    totalAmount: 3245.8,
-    successRate: 98.6,
-    averageAmount: 22.85,
-    todayChange: 12.5,
-    amountChange: 8.2,
-    rateChange: -0.4,
-    avgChange: 3.1,
+  const [stats, setStats] = useState<Stats>({
+    today: 0,
+    totalAmount: 0,
+    successRate: 0,
+    averageAmount: 0,
+    todayChange: 0,
+    amountChange: 0,
+    rateChange: 0,
+    avgChange: 0,
   })
 
-  useEffect(() => {
-    loadTransactions()
-  }, [filters])
+  const calculateBasicStats = (transactions: Transaction[], dateFilter?: string) => {
+    const filteredTransactions = dateFilter
+      ? transactions.filter(t => t.date_transaction.split('T')[0] === dateFilter)
+      : transactions
 
-  const loadTransactions = async () => {
-    try {
-      setLoading(true)
-      const response = await transactionsService.getTransactions(filters)
-      setTransactions(response.results || response)
-    } catch (error) {
-      console.error("Erreur lors du chargement des transactions:", error)
-    } finally {
-      setLoading(false)
+    if (filteredTransactions.length === 0) {
+      return {
+        today: 0,
+        totalAmount: 0,
+        successRate: 0,
+        averageAmount: 0,
+      }
+    }
+
+    const totalAmount = filteredTransactions.reduce(
+      (sum, t) => sum + parseFloat(String(t.montant)),
+      0
+    )
+
+    const successfulTransactions = filteredTransactions.filter(
+      t => t.statut === 'VALIDEE'
+    ).length
+
+    const successRate = (successfulTransactions / filteredTransactions.length) * 100
+    const averageAmount = totalAmount / filteredTransactions.length
+
+    return {
+      today: filteredTransactions.length,
+      totalAmount,
+      successRate,
+      averageAmount,
     }
   }
+
+  const calculateStats = async (currentTransactions: Transaction[]) => {
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    const todayStr = today.toISOString().split('T')[0]
+    const yesterdayStr = yesterday.toISOString().split('T')[0]
+
+    const todayTransactions = currentTransactions.filter(t =>
+      t.date_transaction.split('T')[0] === todayStr
+    )
+
+    let yesterdayTransactions: Transaction[] = []
+    try {
+      const yesterdayResponse = await transactionsService.getTransactions({
+        date_debut: yesterdayStr,
+        date_fin: yesterdayStr
+      })
+      yesterdayTransactions = yesterdayResponse.results || yesterdayResponse
+    } catch (error) {
+      console.error("Erreur récup données hier", error)
+    }
+
+    const currentStats = calculateBasicStats(currentTransactions, todayStr)
+    const yesterdayStats = calculateBasicStats(yesterdayTransactions, yesterdayStr)
+
+    const calculateChange = (current: number, previous: number) => {
+      if (previous === 0) return current === 0 ? 0 : 100
+      return ((current - previous) / previous) * 100
+    }
+
+    return {
+      today: currentStats.today,
+      totalAmount: currentStats.totalAmount,
+      successRate: currentStats.successRate,
+      averageAmount: currentStats.averageAmount,
+      todayChange: calculateChange(currentStats.today, yesterdayStats.today),
+      amountChange: calculateChange(currentStats.totalAmount, yesterdayStats.totalAmount),
+      rateChange: calculateChange(currentStats.successRate, yesterdayStats.successRate),
+      avgChange: calculateChange(currentStats.averageAmount, yesterdayStats.averageAmount),
+    }
+  }
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true)
+        const response = await transactionsService.getTransactions(filters)
+        setTransactions(response.results || response)
+
+        const calculatedStats = await calculateStats(response.results || response)
+        setStats(calculatedStats)
+      } catch (error) {
+        console.error("Erreur lors du chargement des transactions:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [filters])
 
   const handleFilterChange = (key: keyof TransactionFilters, value: string) => {
     setFilters((prev) => ({
       ...prev,
       [key]: value,
-      page: 1, // Reset to first page when filtering
+      page: 1,
     }))
   }
 
@@ -116,20 +208,122 @@ export default function TransactionsPage() {
     }))
   }
 
+  const [exporting, setExporting] = useState(false);
+
   const exportTransactions = async () => {
     try {
-      // Implementation for export functionality
-      console.log("Exporting transactions...")
-    } catch (error) {
-      console.error("Erreur lors de l'export:", error)
-    }
-  }
+      setExporting(true);
 
-  const formatAmount = (amount: number) => {
+      const allTransactions = await transactionsService.getTransactions({
+        ...filters,
+        page_size: 10000,
+        page: 1,
+      });
+
+      const transactionsToExport = allTransactions.results || allTransactions;
+
+      if (transactionsToExport.length === 0) {
+        alert("Aucune transaction à exporter");
+        return;
+      }
+
+      // Créer les en-têtes CSV
+      const headers = [
+        "ID Transaction",
+        "Référence",
+        "Date",
+        "Heure",
+        "Type",
+        "Montant",
+        "Statut",
+        "Carte",
+        "Client",
+        "Commerçant",
+        "Catégorie",
+        "Localisation",
+        "Frais",
+        "Solde avant",
+        "Solde après"
+      ];
+      // Créer les lignes de données
+
+      interface ExportTransactionRow {
+        id: string;
+        reference_interne: string;
+        date: string;
+        time: string;
+        type: string;
+        montant: number | string;
+        statut: string;
+        carte: string;
+        client: string;
+        merchant_nom: string;
+        categorie: string;
+        localisation: string;
+        frais_transaction: number | string;
+        solde_avant: number | string;
+        solde_apres: number | string;
+      }
+
+      const rows: ExportTransactionRow[] = transactionsToExport.map((transaction: Transaction) => ({
+        id: transaction.id,
+        reference_interne: transaction.reference_interne,
+        date: formatDate(transaction.date_transaction),
+        time: formatTime(transaction.date_transaction),
+        type: typeConfig[transaction.type_transaction].label,
+        montant: transaction.montant,
+        statut: statusConfig[transaction.statut].label,
+        carte: `••••${getCardLastFour(transaction.carte)}`,
+        client: `Client#${transaction.carte.slice(0, 8)}`,
+        merchant_nom: transaction.merchant_nom || "N/A",
+        categorie: transaction.categorie || "N/A",
+        localisation: transaction.localisation || "N/A",
+        frais_transaction: transaction.frais_transaction,
+        solde_avant: transaction.solde_avant,
+        solde_apres: transaction.solde_apres,
+      }));
+
+      // Créer le contenu CSV
+      const csvContent = [
+        headers.join(";"),
+        ...rows.map(row => Object.values(row).join(";"))
+      ].join("\n");
+
+      // Créer un blob et déclencher le téléchargement
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `transactions_${new Date().toISOString().slice(0, 10)}.csv`);
+      link.style.visibility = "hidden";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+    } catch (error) {
+      console.error("Erreur lors de l'export:", error);
+      alert("Une erreur est survenue lors de l'export");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Modifier le bouton pour afficher l'état de chargement
+  <Button variant="outline" onClick={exportTransactions} disabled={exporting}>
+    {exporting ? (
+      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+    ) : (
+      <Download className="h-4 w-4 mr-2" />
+    )}
+    {exporting ? "Export en cours..." : "Exporter"}
+  </Button>
+
+  const formatAmount = (amount: number | string) => {
+    const amountNumber = typeof amount === 'string' ? parseFloat(amount) : amount
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
       currency: "EUR",
-    }).format(amount)
+    }).format(amountNumber)
   }
 
   const formatDate = (dateString: string) => {
@@ -189,7 +383,7 @@ export default function TransactionsPage() {
                     ) : (
                       <ArrowDownRight className="h-3 w-3 mr-1" />
                     )}
-                    {Math.abs(stats.todayChange)}% vs hier
+                    {Math.abs(stats.todayChange).toFixed(1)}% vs hier
                   </p>
                 </div>
                 <div className="bg-purple-100 p-3 rounded-lg">
@@ -213,7 +407,7 @@ export default function TransactionsPage() {
                     ) : (
                       <ArrowDownRight className="h-3 w-3 mr-1" />
                     )}
-                    {Math.abs(stats.amountChange)}% vs hier
+                    {Math.abs(stats.amountChange).toFixed(1)}% vs hier
                   </p>
                 </div>
                 <div className="bg-green-100 p-3 rounded-lg">
@@ -228,7 +422,7 @@ export default function TransactionsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-500">Taux de réussite</p>
-                  <p className="text-2xl font-bold text-gray-900 mt-1">{stats.successRate}%</p>
+                  <p className="text-2xl font-bold text-gray-900 mt-1">{stats.successRate.toFixed(1)}%</p>
                   <p
                     className={`text-sm mt-1 flex items-center ${stats.rateChange >= 0 ? "text-green-600" : "text-red-600"}`}
                   >
@@ -237,7 +431,7 @@ export default function TransactionsPage() {
                     ) : (
                       <ArrowDownRight className="h-3 w-3 mr-1" />
                     )}
-                    {Math.abs(stats.rateChange)}% vs hier
+                    {Math.abs(stats.rateChange).toFixed(1)}% vs hier
                   </p>
                 </div>
                 <div className="bg-blue-100 p-3 rounded-lg">
@@ -261,7 +455,7 @@ export default function TransactionsPage() {
                     ) : (
                       <ArrowDownRight className="h-3 w-3 mr-1" />
                     )}
-                    {Math.abs(stats.avgChange)}% vs hier
+                    {Math.abs(stats.avgChange).toFixed(1)}% vs hier
                   </p>
                 </div>
                 <div className="bg-yellow-100 p-3 rounded-lg">
