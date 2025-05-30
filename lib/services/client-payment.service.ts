@@ -137,6 +137,150 @@ class ClientPaymentService {
     }
   }
 
+  async getDetailedHistory(
+    filters: {
+      type?: string
+      status?: string
+      dateFrom?: string
+      dateTo?: string
+      search?: string
+      page?: number
+      limit?: number
+    } = {},
+  ): Promise<{
+    transactions: Transaction[]
+    total: number
+    page: number
+    totalPages: number
+    stats: {
+      totalTransactions: number
+      totalDepenses: number
+      totalRecus: number
+      transactionsMoyennes: number
+    }
+  }> {
+    try {
+      const params = new URLSearchParams()
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.append(key, value.toString())
+        }
+      })
+
+      const response = await api.get(`/client/payments/detailed-history?${params}`)
+      return response.data
+    } catch (error) {
+      throw new Error("Impossible de récupérer l'historique détaillé")
+    }
+  }
+
+  async getTransactionStatistics(
+    period: "7d" | "30d" | "90d" | "1y" | "custom",
+    customRange?: { from: string; to: string },
+  ): Promise<{
+    totalTransactions: number
+    totalDepenses: number
+    totalRecus: number
+    transactionsMoyennes: number
+    repartitionParType: Array<{ type: string; count: number; amount: number }>
+    evolutionMensuelle: Array<{ month: string; depenses: number; recus: number }>
+    topCommerçants: Array<{ name: string; amount: number; count: number }>
+  }> {
+    try {
+      const params = new URLSearchParams({ period })
+      if (customRange) {
+        params.append("from", customRange.from)
+        params.append("to", customRange.to)
+      }
+
+      const response = await api.get(`/client/payments/statistics?${params}`)
+      return response.data
+    } catch (error) {
+      throw new Error("Impossible de récupérer les statistiques")
+    }
+  }
+
+  async exportTransactions(
+    format: "csv" | "pdf" | "excel",
+    filters: {
+      type?: string
+      status?: string
+      dateFrom?: string
+      dateTo?: string
+    } = {},
+  ): Promise<Blob> {
+    try {
+      const params = new URLSearchParams({ format })
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.append(key, value.toString())
+        }
+      })
+
+      const response = await api.get(`/client/payments/export?${params}`, {
+        responseType: "blob",
+      })
+      return response.data
+    } catch (error) {
+      throw new Error("Impossible d'exporter les transactions")
+    }
+  }
+
+  async getTransactionReceipt(transactionId: string): Promise<Blob> {
+    try {
+      const response = await api.get(`/client/payments/transactions/${transactionId}/receipt`, {
+        responseType: "blob",
+      })
+      return response.data
+    } catch (error) {
+      throw new Error("Impossible de télécharger le reçu")
+    }
+  }
+
+  // Méthodes utilitaires pour l'historique
+  getTransactionTypeLabel(type: string): string {
+    const labels = {
+      paiement: "Paiement",
+      transfert_envoye: "Transfert envoyé",
+      transfert_recu: "Transfert reçu",
+      depot: "Dépôt",
+      retrait: "Retrait",
+      remboursement: "Remboursement",
+    }
+    return labels[type as keyof typeof labels] || type
+  }
+
+  getTransactionStatusLabel(status: string): string {
+    const labels = {
+      reussie: "Réussie",
+      echouee: "Échouée",
+      en_attente: "En attente",
+      annulee: "Annulée",
+    }
+    return labels[status as keyof typeof labels] || status
+  }
+
+  getChannelLabel(channel: string): string {
+    const labels = {
+      rfid: "Carte RFID",
+      qr: "QR Code",
+      mobile: "Application mobile",
+      web: "Site web",
+    }
+    return labels[channel as keyof typeof labels] || channel
+  }
+
+  downloadFile(blob: Blob, filename: string): void {
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  }
+
   // Méthodes utilitaires
   formatAmount(amount: number): string {
     return new Intl.NumberFormat("fr-FR").format(amount) + " Ar"
