@@ -1,4 +1,5 @@
 import api from "../api"
+import { apiAdmin } from "../api-service"
 
 export interface Personne {
   id: string
@@ -34,7 +35,7 @@ export interface Entreprise {
 
 class IdentitesService {
   async getPersonnes(filters: any = {}) {
-    const response = await api.get("/identites/personnes/", { params: filters })
+    const response = await apiAdmin.get("/identites/personnes/", { params: filters })
     return response.data
   }
 

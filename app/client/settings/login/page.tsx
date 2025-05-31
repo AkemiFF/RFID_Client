@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { saveAuthData } from "@/lib/auth"
+import { saveAdminAuthData } from "@/lib/auth"
 import { BASE_URL } from "@/lib/host"
 import { CreditCardIcon, EyeIcon, SlashIcon as EyeSlashIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
-export default function ClientLogin() {
+export default function AdminLogin() {
   const router = useRouter()
   const [formData, setFormData] = useState({
     email: "",
@@ -45,12 +45,10 @@ export default function ClientLogin() {
       }
       const data = await response.json()
 
-
-      saveAuthData(data)
-
+      saveAdminAuthData(data)
       console.log("Login successful", data)
 
-      router.push("/client/dashboard")
+      router.push("/admin")
     } catch (err) {
       setError("Identifiants incorrects. Veuillez réessayer.")
     } finally {
