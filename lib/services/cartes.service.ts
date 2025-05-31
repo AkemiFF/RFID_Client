@@ -1,4 +1,3 @@
-import api from "@/lib/api"
 import { apiAdmin } from "../api-service"
 
 export interface CarteRFID {
@@ -10,7 +9,7 @@ export interface CarteRFID {
   plafond_quotidien: number
   plafond_mensuel: number
   solde_maximum: number
-  statut: "ACTIVE" | "BLOQUEE" | "EXPIREE" | "PERDUE" | "VOLEE" | "INACTIVE"
+  statut: "ACTIVE" | "INACTIVE" | "BLOQUEE" | "EXPIREE" | "PERDUE" | "VOLEE"
   motif_blocage?: string
   date_emission: string
   date_activation?: string
@@ -31,6 +30,18 @@ export interface CarteRFID {
   }
 }
 
+export interface CarteDisponibleAPI {
+  id: string
+  code_uid: string
+  numero_serie: string
+  type_carte: "STANDARD" | "PREMIUM" | "ENTREPRISE"
+  statut: "ACTIVE" | "INACTIVE" | "BLOQUEE" | "EXPIREE" | "PERDUE" | "VOLEE"
+  plafond_quotidien?: number
+  plafond_mensuel?: number
+  solde_maximum?: number
+  date_expiration?: string
+}
+
 export interface CreateCarteData {
   personne?: string
   entreprise?: string
@@ -45,22 +56,16 @@ export interface CreateCarteData {
 export interface CarteFilters {
   statut?: string
   type_carte?: string
+  assignation?: string
   date_creation?: string
   search?: string
   page?: number
   page_size?: number
-  assignation?: string  
 }
 
 class CartesService {
-    async getCartes(filters: CarteFilters = {}) {
-    // Copier les filtres pour ne pas modifier l'objet original
-    const apiFilters = { ...filters }
-
-    // Supprimer le filtre d'assignation car il est géré côté client
-    delete apiFilters.assignation
-
-    const response = await apiAdmin.get("/cartes/cartes/", { params: apiFilters })
+  async getCartes(filters: CarteFilters = {}) {
+    const response = await apiAdmin.get("/cartes/cartes/", { params: filters })
     return response.data
   }
 
@@ -103,5 +108,17 @@ class CartesService {
     const response = await apiAdmin.get(`/cartes/historique-statuts/?carte=${carteId}`)
     return response.data
   }
+
+  async getCartesDisponibles(): Promise<CarteDisponibleAPI[]> {
+    try {
+      // Utiliser le bon endpoint configuré dans les URLs Django
+      const response = await apiAdmin.get("/identites/cartes-disponibles/")
+      return response.data.results || response.data
+    } catch (error) {
+      console.error("Erreur lors de la récupération des cartes disponibles:", error)
+      throw new Error("Impossible de récupérer les cartes disponibles")
+    }
+  }
 }
+
 export const cartesService = new CartesService()

@@ -328,7 +328,7 @@ export default function CardsPage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
                             {carte.personne
-                              ? `${carte.personne.prenom} ${carte.personne.nom}`
+                              ? `${carte.personne.prenom || ''} ${carte.personne.nom || ''}`.trim() || "Nom non renseigné"
                               : carte.entreprise
                                 ? carte.entreprise.raison_sociale
                                 : "Non assigné"}
@@ -341,7 +341,7 @@ export default function CardsPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm font-medium text-gray-900">
-                            €{Number(carte.solde || 0).toFixed(2)}
+                            Ar{Number(carte.solde || 0).toFixed(2)}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -602,16 +602,16 @@ export default function CardsPage() {
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Solde actuel</dt>
                     <dd className="text-sm text-gray-900 font-semibold">
-                      €{Number(selectedCard.solde || 0).toFixed(2)}
+                      Ar{Number(selectedCard.solde || 0).toFixed(2)}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Plafond quotidien</dt>
-                    <dd className="text-sm text-gray-900">€{Number(selectedCard.plafond_quotidien || 0).toFixed(2)}</dd>
+                    <dd className="text-sm text-gray-900">Ar{Number(selectedCard.plafond_quotidien || 0).toFixed(2)}</dd>
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Plafond mensuel</dt>
-                    <dd className="text-sm text-gray-900">€{Number(selectedCard.plafond_mensuel || 0).toFixed(2)}</dd>
+                    <dd className="text-sm text-gray-900">Ar{Number(selectedCard.plafond_mensuel || 0).toFixed(2)}</dd>
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Nombre de transactions</dt>
