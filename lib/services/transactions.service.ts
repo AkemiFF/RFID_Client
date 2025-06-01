@@ -1,5 +1,5 @@
 import api from "../api"
-import { apiAdmin } from "../api-service"
+import apiClient, { apiAdmin } from "../api-service"
 
 export interface Transaction {
   id: string
@@ -50,22 +50,22 @@ export interface TransactionFilters {
 
 class TransactionsService {
   async getTransactions(filters: TransactionFilters = {}) {
-    const response = await api.get("/transactions/transactions/", { params: filters })
+    const response = await apiClient.get("/transactions/transactions/", { params: filters })
     return response.data
   }
 
   async getTransaction(id: string) {
-    const response = await api.get(`/transactions/transactions/${id}/`)
+    const response = await apiClient.get(`/transactions/transactions/${id}/`)
     return response.data
   }
 
   async createTransaction(data: CreateTransactionData) {
-    const response = await api.post("/transactions/transactions/", data)
+    const response = await apiClient.post("/transactions/transactions/", data)
     return response.data
   }
 
   async reprocessTransaction(id: string) {
-    const response = await api.post(`/transactions/transactions/${id}/reprocess/`)
+    const response = await apiClient.post(`/transactions/transactions/${id}/reprocess/`)
     return response.data
   }
 
