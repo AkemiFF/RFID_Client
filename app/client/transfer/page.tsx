@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { transactionsService, CreateTransactionData } from "../services/transactions.service"
+import { transactionsService, CreateTransactionData } from "@/lib/services/transactions.service"
 
 interface Contact {
   id: number
@@ -96,7 +96,7 @@ export default function ClientTransfer() {
         carte: transferData.carteSource,
         type_transaction: "TRANSFERT",
         montant: montant,
-        description: transferData.motif || "Transfert d'argent",
+        description: transferData.motif || `Transfert vers ${selectedContact ? `${selectedContact.prenom} ${selectedContact.nom}` : transferData.destinataire}`,
         categorie: "TRANSFERT",
         localisation: "Client Mobile", // Vous pouvez récupérer la géolocalisation
       }
@@ -104,11 +104,16 @@ export default function ClientTransfer() {
       // Créer la transaction
       const result = await transactionsService.createTransaction(transactionData)
       
-      if (result.statut === "VALIDEE") {
+      // Vérifier le statut de la transaction
+      if (result.statut === "VALIDEE" || result.statut === "EN_COURS") {
         setTransactionResult(result)
         setSuccess(true)
+      } else if (result.statut === "ECHOUEE") {
+        throw new Error(result.message_erreur || "Transaction échouée")
       } else {
-        throw new Error(result.message_erreur || "Erreur lors du transfert")
+        // Pour les autres statuts, considérer comme réussi mais en attente
+        setTransactionResult(result)
+        setSuccess(true)
       }
 
     } catch (err: any) {
@@ -157,8 +162,24 @@ export default function ClientTransfer() {
                   <span className="font-mono">{transactionResult.reference_interne}</span>
                 </div>
                 <div className="flex justify-between">
+                  <span>Statut:</span>
+                  <span className={`font-semibold ${
+                    transactionResult.statut === "VALIDEE" ? "text-green-600" : 
+                    transactionResult.statut === "EN_COURS" ? "text-orange-600" : 
+                    "text-gray-600"
+                  }`}>
+                    {transactionResult.statut === "VALIDEE" ? "Validée" :
+                     transactionResult.statut === "EN_COURS" ? "En cours" :
+                     transactionResult.statut}
+                  </span>
+                </div>
+                <div className="flex justify-between">
                   <span>Date:</span>
                   <span>{new Date(transactionResult.date_transaction).toLocaleString('fr-FR')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Frais:</span>
+                  <span>{formatMontant(transactionResult.frais_transaction)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Nouveau solde:</span>
