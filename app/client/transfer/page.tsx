@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { ArrowRightIcon, UserIcon, CheckIcon } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { transactionsService, CreateTransactionData } from "../services/transactions.service"
 
 interface Contact {
   id: number
@@ -17,29 +18,48 @@ interface Contact {
   avatar?: string
 }
 
+interface Carte {
+  id: string
+  numero: string
+  type: string
+  solde: number
+}
+
 export default function ClientTransfer() {
   const [step, setStep] = useState(1)
   const [transferData, setTransferData] = useState({
     destinataire: "",
     montant: "",
     motif: "",
-    carteSource: "1",
+    carteSource: "",
+    carteDestinataire: "",
   })
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [error, setError] = useState("")
+  const [cartes, setCartes] = useState<Carte[]>([])
+  const [transactionResult, setTransactionResult] = useState<any>(null)
 
-  // Contacts récents simulés
+  // Contacts récents simulés (vous pouvez les récupérer depuis votre API)
   const contactsRecents: Contact[] = [
     { id: 1, nom: "Martin", prenom: "Sophie", telephone: "+261 34 12 345 67", email: "sophie.martin@email.com" },
     { id: 2, nom: "Raddkoto", prenom: "Jean", telephone: "+261 33 98 765 43", email: "jean.rakoto@email.com" },
     { id: 3, nom: "Andry", prenom: "Marie", telephone: "+261 32 55 444 33", email: "marie.andry@email.com" },
   ]
 
-  const cartes = [
-    { id: "1", numero: "1234567890123456", type: "Standard", solde: 75000 },
-    { id: "2", numero: "9876543210987654", type: "Premium", solde: 50000 },
-  ]
+  // Simulation des cartes (remplacez par un appel API réel)
+  useEffect(() => {
+    // Ici vous pouvez appeler votre API pour récupérer les cartes de l'utilisateur
+    const cartesSimulees: Carte[] = [
+      { id: "1", numero: "1234567890123456", type: "Standard", solde: 75000 },
+      { id: "2", numero: "9876543210987654", type: "Premium", solde: 50000 },
+    ]
+    setCartes(cartesSimulees)
+    if (cartesSimulees.length > 0) {
+      setTransferData(prev => ({ ...prev, carteSource: cartesSimulees[0].id }))
+    }
+  }, [])
 
   const formatMontant = (montant: number) => {
     return new Intl.NumberFormat("fr-FR").format(montant) + " Ar"
@@ -50,24 +70,71 @@ export default function ClientTransfer() {
     setTransferData({ ...transferData, destinataire: contact.telephone })
   }
 
+  const calculateFees = (montant: number): number => {
+    // Logique de calcul des frais selon vos règles métier
+    if (montant <= 10000) return 0
+    if (montant <= 50000) return Math.ceil(montant * 0.01) // 1%
+    return Math.ceil(montant * 0.005) // 0.5% pour les gros montants
+  }
+
   const handleSubmit = async () => {
     setLoading(true)
+    setError("")
 
-    // Simulation de l'envoi
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    try {
+      const montant = parseInt(transferData.montant)
+      const frais = calculateFees(montant)
+      
+      // Vérifier le solde disponible
+      const carteSource = cartes.find(c => c.id === transferData.carteSource)
+      if (!carteSource || carteSource.solde < (montant + frais)) {
+        throw new Error("Solde insuffisant pour effectuer cette transaction")
+      }
 
-    setSuccess(true)
-    setLoading(false)
+      // Préparer les données de transaction
+      const transactionData: CreateTransactionData = {
+        carte: transferData.carteSource,
+        type_transaction: "TRANSFERT",
+        montant: montant,
+        description: transferData.motif || "Transfert d'argent",
+        categorie: "TRANSFERT",
+        localisation: "Client Mobile", // Vous pouvez récupérer la géolocalisation
+      }
+
+      // Créer la transaction
+      const result = await transactionsService.createTransaction(transactionData)
+      
+      if (result.statut === "VALIDEE") {
+        setTransactionResult(result)
+        setSuccess(true)
+      } else {
+        throw new Error(result.message_erreur || "Erreur lors du transfert")
+      }
+
+    } catch (err: any) {
+      console.error("Erreur lors du transfert:", err)
+      setError(err.message || "Une erreur est survenue lors du transfert")
+    } finally {
+      setLoading(false)
+    }
   }
 
   const resetTransfer = () => {
     setStep(1)
-    setTransferData({ destinataire: "", montant: "", motif: "", carteSource: "1" })
+    setTransferData({ 
+      destinataire: "", 
+      montant: "", 
+      motif: "", 
+      carteSource: cartes.length > 0 ? cartes[0].id : "",
+      carteDestinataire: ""
+    })
     setSelectedContact(null)
     setSuccess(false)
+    setError("")
+    setTransactionResult(null)
   }
 
-  if (success) {
+  if (success && transactionResult) {
     return (
       <div className="max-w-md mx-auto">
         <Card>
@@ -76,10 +143,30 @@ export default function ClientTransfer() {
               <CheckIcon className="h-8 w-8 text-green-600" />
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Transfert réussi !</h2>
-            <p className="text-gray-600 mb-6">
-              {formatMontant(Number.parseInt(transferData.montant))} ont été envoyés à {selectedContact?.prenom}{" "}
-              {selectedContact?.nom}
+            <p className="text-gray-600 mb-4">
+              {formatMontant(parseInt(transferData.montant))} ont été envoyés à {selectedContact?.prenom}{" "}
+              {selectedContact?.nom || transferData.destinataire}
             </p>
+            
+            {/* Détails de la transaction */}
+            <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+              <h3 className="font-semibold text-gray-900 mb-2">Détails de la transaction</h3>
+              <div className="space-y-1 text-sm text-gray-600">
+                <div className="flex justify-between">
+                  <span>Référence:</span>
+                  <span className="font-mono">{transactionResult.reference_interne}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Date:</span>
+                  <span>{new Date(transactionResult.date_transaction).toLocaleString('fr-FR')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Nouveau solde:</span>
+                  <span className="font-semibold">{formatMontant(transactionResult.solde_apres)}</span>
+                </div>
+              </div>
+            </div>
+
             <div className="space-y-3">
               <Button onClick={resetTransfer} className="w-full">
                 Nouveau transfert
@@ -100,6 +187,15 @@ export default function ClientTransfer() {
         <h1 className="text-2xl font-bold text-gray-900">Transfert d'argent</h1>
         <p className="text-gray-600">Envoyez de l'argent rapidement et en sécurité</p>
       </div>
+
+      {/* Affichage des erreurs */}
+      {error && (
+        <Alert className="border-red-200 bg-red-50">
+          <AlertDescription className="text-red-800">
+            {error}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Indicateur d'étapes */}
       <div className="flex items-center justify-center space-x-4 mb-8">
@@ -165,10 +261,10 @@ export default function ClientTransfer() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="destinataire">Numéro de téléphone ou email</Label>
+              <Label htmlFor="destinataire">Numéro de carte ou téléphone</Label>
               <Input
                 id="destinataire"
-                placeholder="+261 34 12 345 67 ou email@example.com"
+                placeholder="Numéro de carte ou téléphone du destinataire"
                 value={transferData.destinataire}
                 onChange={(e) => setTransferData({ ...transferData, destinataire: e.target.value })}
               />
@@ -224,6 +320,11 @@ export default function ClientTransfer() {
                 onChange={(e) => setTransferData({ ...transferData, montant: e.target.value })}
                 className="text-lg"
               />
+              {transferData.montant && (
+                <p className="text-sm text-gray-500">
+                  Frais: {formatMontant(calculateFees(parseInt(transferData.montant) || 0))}
+                </p>
+              )}
             </div>
 
             {/* Montants rapides */}
@@ -260,7 +361,7 @@ export default function ClientTransfer() {
               <Button
                 onClick={() => setStep(3)}
                 className="flex-1"
-                disabled={!transferData.montant || Number.parseInt(transferData.montant) <= 0}
+                disabled={!transferData.montant || parseInt(transferData.montant) <= 0}
               >
                 Continuer
                 <ArrowRightIcon className="ml-2 h-4 w-4" />
@@ -286,11 +387,11 @@ export default function ClientTransfer() {
               </div>
               <div className="flex justify-between py-3 border-b">
                 <span className="text-gray-600">Montant</span>
-                <span className="font-medium text-lg">{formatMontant(Number.parseInt(transferData.montant))}</span>
+                <span className="font-medium text-lg">{formatMontant(parseInt(transferData.montant))}</span>
               </div>
               <div className="flex justify-between py-3 border-b">
                 <span className="text-gray-600">Frais</span>
-                <span className="font-medium">Gratuit</span>
+                <span className="font-medium">{formatMontant(calculateFees(parseInt(transferData.montant)))}</span>
               </div>
               {transferData.motif && (
                 <div className="flex justify-between py-3 border-b">
@@ -299,8 +400,8 @@ export default function ClientTransfer() {
                 </div>
               )}
               <div className="flex justify-between py-3 text-lg font-bold">
-                <span>Total</span>
-                <span>{formatMontant(Number.parseInt(transferData.montant))}</span>
+                <span>Total à débiter</span>
+                <span>{formatMontant(parseInt(transferData.montant) + calculateFees(parseInt(transferData.montant)))}</span>
               </div>
             </div>
 
@@ -311,7 +412,7 @@ export default function ClientTransfer() {
             </Alert>
 
             <div className="flex space-x-3">
-              <Button variant="outline" onClick={() => setStep(2)} className="flex-1">
+              <Button variant="outline" onClick={() => setStep(2)} className="flex-1" disabled={loading}>
                 Modifier
               </Button>
               <Button onClick={handleSubmit} className="flex-1" disabled={loading}>
