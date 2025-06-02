@@ -1,26 +1,26 @@
 "use client"
 
-import { useState } from "react"
 import Layout from "@/components/layout/Layout"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Modal from "@/components/ui/Modal"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import StatusBadge from "@/components/ui/StatusBadge"
 import {
-  PlusIcon,
   ArrowDownTrayIcon,
-  BuildingStorefrontIcon,
   BuildingOfficeIcon,
-  TruckIcon,
-  FilmIcon,
-  EyeIcon,
-  PencilIcon,
+  BuildingStorefrontIcon,
   ChartBarIcon,
+  EyeIcon,
+  FilmIcon,
   MapPinIcon,
+  PencilIcon,
+  PlusIcon,
+  TruckIcon,
 } from "@heroicons/react/24/outline"
+import { useState } from "react"
 
 interface Merchant {
   id: string
@@ -447,7 +447,7 @@ export default function MerchantsPage() {
         isOpen={showDetailsModal}
         onClose={() => setShowDetailsModal(false)}
         title={`Détails du commerçant ${selectedMerchant?.id}`}
-        size="large"
+        size="lg"
       >
         {selectedMerchant && (
           <div className="space-y-6">
@@ -555,7 +555,7 @@ export default function MerchantsPage() {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         title="Ajouter un nouveau commerçant"
-        size="large"
+        size="lg"
       >
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4">

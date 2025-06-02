@@ -1,24 +1,25 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import Layout from "@/components/layout/Layout"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { Euro, CreditCard, Store, PiggyBank, Download, Filter, FileText, BarChart3, ArrowUp } from "lucide-react"
 import {
-  Chart as ChartJS,
+  ArcElement,
   CategoryScale,
+  Chart as ChartJS,
+  Legend,
   LinearScale,
-  PointElement,
   LineElement,
+  PointElement,
   Title,
   Tooltip,
-  Legend,
-  ArcElement,
 } from "chart.js"
-import { Line, Doughnut } from "react-chartjs-2"
+import { ArrowUp, BarChart3, CreditCard, Download, Euro, FileText, Filter, PiggyBank, Store } from "lucide-react"
+import { useState } from "react"
+import { Doughnut, Line } from "react-chartjs-2"
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, ArcElement)
 
@@ -231,323 +232,324 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Rapports</h1>
-          <p className="text-gray-600">Analysez vos données financières et transactions</p>
+    <Layout>
+      <div className="container mx-auto p-6 space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Rapports</h1>
+            <p className="text-gray-600">Analysez vos données financières et transactions</p>
+          </div>
         </div>
-      </div>
 
-      {/* Date Range Selector */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">Période d'analyse</h3>
-              <p className="text-sm text-gray-500">Sélectionnez une période pour générer des rapports</p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <Input
-                type="date"
-                value={dateRange.from}
-                onChange={(e) => setDateRange((prev) => ({ ...prev, from: e.target.value }))}
-                className="w-auto"
-              />
-              <span className="text-gray-500">à</span>
-              <Input
-                type="date"
-                value={dateRange.to}
-                onChange={(e) => setDateRange((prev) => ({ ...prev, to: e.target.value }))}
-                className="w-auto"
-              />
-              <Button>
-                <Filter className="w-4 h-4 mr-2" />
-                Appliquer
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Dépenses totales</p>
-                <p className="text-2xl font-semibold text-gray-900">€{stats.totalExpenses}</p>
-                <p className="text-sm text-purple-600 flex items-center mt-1">
-                  <ArrowUp className="w-4 h-4 mr-1" />
-                  {stats.expensesTrend}% vs période précédente
-                </p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
-                <Euro className="w-6 h-6" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Transactions</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.totalTransactions}</p>
-                <p className="text-sm text-green-600 flex items-center mt-1">
-                  <ArrowUp className="w-4 h-4 mr-1" />
-                  {stats.transactionsTrend}% vs période précédente
-                </p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-                <CreditCard className="w-6 h-6" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Commerçants</p>
-                <p className="text-2xl font-semibold text-gray-900">{stats.totalMerchants}</p>
-                <p className="text-sm text-blue-600 flex items-center mt-1">
-                  <ArrowUp className="w-4 h-4 mr-1" />
-                  {stats.merchantsTrend} nouveaux
-                </p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                <Store className="w-6 h-6" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-500">Économies</p>
-                <p className="text-2xl font-semibold text-gray-900">€{stats.totalSavings}</p>
-                <p className="text-sm text-yellow-600 flex items-center mt-1">
-                  <ArrowUp className="w-4 h-4 mr-1" />
-                  {stats.savingsTrend}% de réduction
-                </p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600">
-                <PiggyBank className="w-6 h-6" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Spending Trend */}
+        {/* Date Range Selector */}
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Tendance des dépenses</CardTitle>
-              <div className="flex space-x-2">
-                <Button variant="outline" size="sm">
-                  Mensuel
-                </Button>
-                <Button variant="ghost" size="sm">
-                  Hebdo
-                </Button>
-                <Button variant="ghost" size="sm">
-                  Quotidien
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Période d'analyse</h3>
+                <p className="text-sm text-gray-500">Sélectionnez une période pour générer des rapports</p>
+              </div>
+              <div className="flex items-center space-x-4">
+                <Input
+                  type="date"
+                  value={dateRange.from}
+                  onChange={(e) => setDateRange((prev) => ({ ...prev, from: e.target.value }))}
+                  className="w-auto"
+                />
+                <span className="text-gray-500">à</span>
+                <Input
+                  type="date"
+                  value={dateRange.to}
+                  onChange={(e) => setDateRange((prev) => ({ ...prev, to: e.target.value }))}
+                  className="w-auto"
+                />
+                <Button>
+                  <Filter className="w-4 h-4 mr-2" />
+                  Appliquer
                 </Button>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80">
-              <Line data={spendingChartData} options={chartOptions} />
             </div>
           </CardContent>
         </Card>
 
-        {/* Category Distribution */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Répartition par catégorie</CardTitle>
-              <Button variant="outline" size="sm">
-                <Download className="w-4 h-4 mr-2" />
-                Exporter
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80">
-              <Doughnut data={categoryChartData} options={doughnutOptions} />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Detailed Reports */}
-      <Card>
-        <Tabs defaultValue="transactions" className="w-full">
-          <div className="border-b">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="transactions">Transactions</TabsTrigger>
-              <TabsTrigger value="merchants">Commerçants</TabsTrigger>
-              <TabsTrigger value="locations">Localisations</TabsTrigger>
-              <TabsTrigger value="cards">Cartes</TabsTrigger>
-            </TabsList>
-          </div>
-
-          <TabsContent value="transactions" className="mt-0">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Commerçant
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Catégorie
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Montant
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Carte
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Statut
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {transactions.map((transaction) => (
-                    <tr key={transaction.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{transaction.date}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3">
-                            <Store className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{transaction.merchant}</div>
-                            <div className="text-sm text-gray-500">{transaction.location}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <span className="mr-2">{getCategoryIcon(transaction.category)}</span>
-                          <span className="text-sm text-gray-900">{transaction.category}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        €{transaction.amount.toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <CreditCard className="w-4 h-4 text-purple-600 mr-2" />
-                          <span className="text-sm text-gray-900">{transaction.card}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(transaction.status)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            <div className="bg-gray-50 px-6 py-3 flex items-center justify-between border-t border-gray-200">
-              <div className="flex-1 flex justify-between sm:hidden">
-                <Button variant="outline">Précédent</Button>
-                <Button variant="outline">Suivant</Button>
-              </div>
-              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-700">
-                    Affichage de <span className="font-medium">1</span> à <span className="font-medium">5</span> sur{" "}
-                    <span className="font-medium">{transactions.length}</span> transactions
+                  <p className="text-sm font-medium text-gray-500">Dépenses totales</p>
+                  <p className="text-2xl font-semibold text-gray-900">€{stats.totalExpenses}</p>
+                  <p className="text-sm text-purple-600 flex items-center mt-1">
+                    <ArrowUp className="w-4 h-4 mr-1" />
+                    {stats.expensesTrend}% vs période précédente
                   </p>
                 </div>
+                <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
+                  <Euro className="w-6 h-6" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Transactions</p>
+                  <p className="text-2xl font-semibold text-gray-900">{stats.totalTransactions}</p>
+                  <p className="text-sm text-green-600 flex items-center mt-1">
+                    <ArrowUp className="w-4 h-4 mr-1" />
+                    {stats.transactionsTrend}% vs période précédente
+                  </p>
+                </div>
+                <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                  <CreditCard className="w-6 h-6" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Commerçants</p>
+                  <p className="text-2xl font-semibold text-gray-900">{stats.totalMerchants}</p>
+                  <p className="text-sm text-blue-600 flex items-center mt-1">
+                    <ArrowUp className="w-4 h-4 mr-1" />
+                    {stats.merchantsTrend} nouveaux
+                  </p>
+                </div>
+                <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                  <Store className="w-6 h-6" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Économies</p>
+                  <p className="text-2xl font-semibold text-gray-900">€{stats.totalSavings}</p>
+                  <p className="text-sm text-yellow-600 flex items-center mt-1">
+                    <ArrowUp className="w-4 h-4 mr-1" />
+                    {stats.savingsTrend}% de réduction
+                  </p>
+                </div>
+                <div className="h-12 w-12 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600">
+                  <PiggyBank className="w-6 h-6" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Spending Trend */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Tendance des dépenses</CardTitle>
                 <div className="flex space-x-2">
                   <Button variant="outline" size="sm">
-                    Précédent
+                    Mensuel
                   </Button>
-                  <Button variant="outline" size="sm">
-                    1
+                  <Button variant="ghost" size="sm">
+                    Hebdo
                   </Button>
-                  <Button variant="outline" size="sm">
-                    2
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    3
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    Suivant
+                  <Button variant="ghost" size="sm">
+                    Quotidien
                   </Button>
                 </div>
               </div>
-            </div>
-          </TabsContent>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <Line data={spendingChartData} options={chartOptions} />
+              </div>
+            </CardContent>
+          </Card>
 
-          <TabsContent value="merchants">
-            <div className="p-6 text-center text-gray-500">
-              <Store className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <p>Rapport des commerçants en cours de développement</p>
-            </div>
-          </TabsContent>
+          {/* Category Distribution */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Répartition par catégorie</CardTitle>
+                <Button variant="outline" size="sm">
+                  <Download className="w-4 h-4 mr-2" />
+                  Exporter
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <Doughnut data={categoryChartData} options={doughnutOptions} />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-          <TabsContent value="locations">
-            <div className="p-6 text-center text-gray-500">
-              <BarChart3 className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <p>Rapport des localisations en cours de développement</p>
+        {/* Detailed Reports */}
+        <Card>
+          <Tabs defaultValue="transactions" className="w-full">
+            <div className="border-b">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="transactions">Transactions</TabsTrigger>
+                <TabsTrigger value="merchants">Commerçants</TabsTrigger>
+                <TabsTrigger value="locations">Localisations</TabsTrigger>
+                <TabsTrigger value="cards">Cartes</TabsTrigger>
+              </TabsList>
             </div>
-          </TabsContent>
 
-          <TabsContent value="cards">
-            <div className="p-6 text-center text-gray-500">
-              <CreditCard className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-              <p>Rapport des cartes en cours de développement</p>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </Card>
+            <TabsContent value="transactions" className="mt-0">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Date
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Commerçant
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Catégorie
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Montant
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Carte
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Statut
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {transactions.map((transaction) => (
+                      <tr key={transaction.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{transaction.date}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3">
+                              <Store className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">{transaction.merchant}</div>
+                              <div className="text-sm text-gray-500">{transaction.location}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <span className="mr-2">{getCategoryIcon(transaction.category)}</span>
+                            <span className="text-sm text-gray-900">{transaction.category}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          €{transaction.amount.toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <CreditCard className="w-4 h-4 text-purple-600 mr-2" />
+                            <span className="text-sm text-gray-900">{transaction.card}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">{getStatusBadge(transaction.status)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-      {/* Export Section */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">Exporter des rapports</h3>
-              <p className="text-sm text-gray-500">Générez et téléchargez des rapports détaillés</p>
+              {/* Pagination */}
+              <div className="bg-gray-50 px-6 py-3 flex items-center justify-between border-t border-gray-200">
+                <div className="flex-1 flex justify-between sm:hidden">
+                  <Button variant="outline">Précédent</Button>
+                  <Button variant="outline">Suivant</Button>
+                </div>
+                <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm text-gray-700">
+                      Affichage de <span className="font-medium">1</span> à <span className="font-medium">5</span> sur{" "}
+                      <span className="font-medium">{transactions.length}</span> transactions
+                    </p>
+                  </div>
+                  <div className="flex space-x-2">
+                    <Button variant="outline" size="sm">
+                      Précédent
+                    </Button>
+                    <Button variant="outline" size="sm">
+                      1
+                    </Button>
+                    <Button variant="outline" size="sm">
+                      2
+                    </Button>
+                    <Button variant="outline" size="sm">
+                      3
+                    </Button>
+                    <Button variant="outline" size="sm">
+                      Suivant
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="merchants">
+              <div className="p-6 text-center text-gray-500">
+                <Store className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                <p>Rapport des commerçants en cours de développement</p>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="locations">
+              <div className="p-6 text-center text-gray-500">
+                <BarChart3 className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                <p>Rapport des localisations en cours de développement</p>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="cards">
+              <div className="p-6 text-center text-gray-500">
+                <CreditCard className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                <p>Rapport des cartes en cours de développement</p>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </Card>
+
+        {/* Export Section */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Exporter des rapports</h3>
+                <p className="text-sm text-gray-500">Générez et téléchargez des rapports détaillés</p>
+              </div>
+              <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
+                <Button variant="outline" onClick={() => handleExport("pdf")}>
+                  <FileText className="w-4 h-4 mr-2 text-red-500" />
+                  PDF
+                </Button>
+                <Button variant="outline" onClick={() => handleExport("excel")}>
+                  <FileText className="w-4 h-4 mr-2 text-green-500" />
+                  Excel
+                </Button>
+                <Button variant="outline" onClick={() => handleExport("csv")}>
+                  <FileText className="w-4 h-4 mr-2 text-purple-500" />
+                  CSV
+                </Button>
+              </div>
             </div>
-            <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
-              <Button variant="outline" onClick={() => handleExport("pdf")}>
-                <FileText className="w-4 h-4 mr-2 text-red-500" />
-                PDF
-              </Button>
-              <Button variant="outline" onClick={() => handleExport("excel")}>
-                <FileText className="w-4 h-4 mr-2 text-green-500" />
-                Excel
-              </Button>
-              <Button variant="outline" onClick={() => handleExport("csv")}>
-                <FileText className="w-4 h-4 mr-2 text-purple-500" />
-                CSV
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          </CardContent>
+        </Card>
+      </div></Layout>
   )
 }

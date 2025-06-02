@@ -77,7 +77,7 @@ export const refreshToken = async (): Promise<string> => {
 export const refreshAdminToken = async (): Promise<string> => {
     const refreshToken = getAdminRefreshToken();
 
-    const response = await fetch(`${BASE_URL}/api/auth/token/refresh/admin/`, {
+    const response = await fetch(`${BASE_URL}/api/auth/refresh/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh: refreshToken }),
