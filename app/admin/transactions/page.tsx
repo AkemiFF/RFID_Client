@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Layout from "@/components/layout/Layout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -28,7 +28,7 @@ import {
   ChevronRight,
   Loader2,
 } from "lucide-react"
-import { transactionsService, type Transaction, type TransactionFilters } from "@/lib/services/transactions.service"
+import { transactionsService, type Transaction } from "@/lib/services/transactions.service"
 
 const statusConfig = {
   VALIDEE: {
@@ -76,12 +76,18 @@ interface Stats {
 }
 
 export default function TransactionsPage() {
-  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([])
+  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
-  const [filters, setFilters] = useState<TransactionFilters>({
+  const [filters, setFilters] = useState({
     page: 1,
     page_size: 10,
+    statut: undefined as string | undefined,
+    type_transaction: undefined as string | undefined,
+    date_debut: undefined as string | undefined,
+    date_fin: undefined as string | undefined,
+    search: undefined as string | undefined,
   })
   const [searchTerm, setSearchTerm] = useState("")
   const [stats, setStats] = useState<Stats>({
@@ -94,92 +100,18 @@ export default function TransactionsPage() {
     rateChange: 0,
     avgChange: 0,
   })
+  const [exporting, setExporting] = useState(false)
 
-  const calculateBasicStats = (transactions: Transaction[], dateFilter?: string) => {
-    const filteredTransactions = dateFilter
-      ? transactions.filter(t => t.date_transaction.split('T')[0] === dateFilter)
-      : transactions
-
-    if (filteredTransactions.length === 0) {
-      return {
-        today: 0,
-        totalAmount: 0,
-        successRate: 0,
-        averageAmount: 0,
-      }
-    }
-
-    const totalAmount = filteredTransactions.reduce(
-      (sum, t) => sum + parseFloat(String(t.montant)),
-      0
-    )
-
-    const successfulTransactions = filteredTransactions.filter(
-      t => t.statut === 'VALIDEE'
-    ).length
-
-    const successRate = (successfulTransactions / filteredTransactions.length) * 100
-    const averageAmount = totalAmount / filteredTransactions.length
-
-    return {
-      today: filteredTransactions.length,
-      totalAmount,
-      successRate,
-      averageAmount,
-    }
-  }
-
-  const calculateStats = async (currentTransactions: Transaction[]) => {
-    const today = new Date()
-    const yesterday = new Date(today)
-    yesterday.setDate(yesterday.getDate() - 1)
-
-    const todayStr = today.toISOString().split('T')[0]
-    const yesterdayStr = yesterday.toISOString().split('T')[0]
-
-    const todayTransactions = currentTransactions.filter(t =>
-      t.date_transaction.split('T')[0] === todayStr
-    )
-
-    let yesterdayTransactions: Transaction[] = []
-    try {
-      const yesterdayResponse = await transactionsService.getTransactions({
-        date_debut: yesterdayStr,
-        date_fin: yesterdayStr
-      })
-      yesterdayTransactions = yesterdayResponse.results || yesterdayResponse
-    } catch (error) {
-      console.error("Erreur récup données hier", error)
-    }
-
-    const currentStats = calculateBasicStats(currentTransactions, todayStr)
-    const yesterdayStats = calculateBasicStats(yesterdayTransactions, yesterdayStr)
-
-    const calculateChange = (current: number, previous: number) => {
-      if (previous === 0) return current === 0 ? 0 : 100
-      return ((current - previous) / previous) * 100
-    }
-
-    return {
-      today: currentStats.today,
-      totalAmount: currentStats.totalAmount,
-      successRate: currentStats.successRate,
-      averageAmount: currentStats.averageAmount,
-      todayChange: calculateChange(currentStats.today, yesterdayStats.today),
-      amountChange: calculateChange(currentStats.totalAmount, yesterdayStats.totalAmount),
-      rateChange: calculateChange(currentStats.successRate, yesterdayStats.successRate),
-      avgChange: calculateChange(currentStats.averageAmount, yesterdayStats.averageAmount),
-    }
-  }
-
+  // Charger toutes les données au montage
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true)
-        const response = await transactionsService.getTransactions(filters)
-        setTransactions(response.results || response)
+        const response = await transactionsService.getTransactions({ page_size: 10000 })
+        const transactions = Array.isArray(response) ? response : response.results || []
+        setAllTransactions(transactions)
 
-        const calculatedStats = await calculateStats(response.results || response)
+        const calculatedStats = await calculateStats(transactions)
         setStats(calculatedStats)
       } catch (error) {
         console.error("Erreur lors du chargement des transactions:", error)
@@ -189,83 +121,141 @@ export default function TransactionsPage() {
     }
 
     loadData()
-  }, [filters])
+  }, [])
 
-  const handleFilterChange = (key: keyof TransactionFilters, value: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value,
-      page: 1,
-    }))
+  // Filtrer les données
+  useEffect(() => {
+    const filtered = allTransactions.filter(transaction => {
+      // Filtre par statut
+      if (filters.statut && transaction.statut !== filters.statut) return false
+
+      // Filtre par type
+      if (filters.type_transaction && transaction.type_transaction !== filters.type_transaction) return false
+
+      // Filtre par date
+      const transactionDate = new Date(transaction.date_transaction).toISOString().split('T')[0]
+      if (filters.date_debut && transactionDate < filters.date_debut) return false
+      if (filters.date_fin && transactionDate > filters.date_fin) return false
+
+      // Filtre par recherche
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase()
+        const matches =
+          transaction.reference_interne.toLowerCase().includes(searchLower) ||
+          transaction.carte.toLowerCase().includes(searchLower) ||
+          (transaction.merchant_nom && transaction.merchant_nom.toLowerCase().includes(searchLower)) ||
+          (transaction.categorie && transaction.categorie.toLowerCase().includes(searchLower)) ||
+          (transaction.localisation && transaction.localisation.toLowerCase().includes(searchLower))
+
+        if (!matches) return false
+      }
+
+      return true
+    })
+
+    setFilteredTransactions(filtered)
+    setFilters(prev => ({ ...prev, page: 1 }))
+  }, [allTransactions, filters.statut, filters.type_transaction, filters.date_debut, filters.date_fin, filters.search])
+
+  // Gestion de la recherche avec debounce
+  useEffect(() => {
+    const timerId = setTimeout(() => {
+      setFilters(prev => ({
+        ...prev,
+        search: searchTerm.trim() !== "" ? searchTerm : undefined
+      }))
+    }, 500)
+
+    return () => clearTimeout(timerId)
+  }, [searchTerm])
+
+  // Pagination
+  const paginatedTransactions = useMemo(() => {
+    const start = (filters.page - 1) * filters.page_size
+    const end = start + filters.page_size
+    return filteredTransactions.slice(start, end)
+  }, [filteredTransactions, filters.page, filters.page_size])
+
+  const totalPages = Math.ceil(filteredTransactions.length / filters.page_size)
+
+  const calculateBasicStats = (transactions: Transaction[], dateFilter?: string) => {
+    const filtered = dateFilter
+      ? transactions.filter(t => new Date(t.date_transaction).toISOString().split('T')[0] === dateFilter)
+      : transactions
+
+    if (filtered.length === 0) {
+      return {
+        today: 0,
+        totalAmount: 0,
+        successRate: 0,
+        averageAmount: 0,
+      }
+    }
+
+    const totalAmount = filtered.reduce((sum, t) => sum + parseFloat(String(t.montant)), 0)
+    const successfulTransactions = filtered.filter(t => t.statut === 'VALIDEE').length
+    const successRate = (successfulTransactions / filtered.length) * 100
+    const averageAmount = totalAmount / filtered.length
+
+    return {
+      today: filtered.length,
+      totalAmount,
+      successRate,
+      averageAmount,
+    }
   }
 
-  const handleSearch = (value: string) => {
-    setSearchTerm(value)
-    setFilters((prev) => ({
-      ...prev,
-      search: value,
-      page: 1,
-    }))
+  const calculateStats = async (transactions: Transaction[]) => {
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    const todayStr = today.toISOString().split('T')[0]
+    const yesterdayStr = yesterday.toISOString().split('T')[0]
+
+    const todayStats = calculateBasicStats(transactions, todayStr)
+    const yesterdayStats = calculateBasicStats(transactions, yesterdayStr)
+
+    const calculateChange = (current: number, previous: number) => {
+      if (previous === 0) return current === 0 ? 0 : 100
+      return ((current - previous) / previous) * 100
+    }
+
+    return {
+      today: todayStats.today,
+      totalAmount: todayStats.totalAmount,
+      successRate: todayStats.successRate,
+      averageAmount: todayStats.averageAmount,
+      todayChange: calculateChange(todayStats.today, yesterdayStats.today),
+      amountChange: calculateChange(todayStats.totalAmount, yesterdayStats.totalAmount),
+      rateChange: calculateChange(todayStats.successRate, yesterdayStats.successRate),
+      avgChange: calculateChange(todayStats.averageAmount, yesterdayStats.averageAmount),
+    }
   }
 
-  const [exporting, setExporting] = useState(false);
+  const handleFilterChange = (key: keyof typeof filters, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value === "ALL" ? undefined : value
+    }))
+  }
 
   const exportTransactions = async () => {
     try {
-      setExporting(true);
+      setExporting(true)
 
-      const allTransactions = await transactionsService.getTransactions({
-        ...filters,
-        page_size: 10000,
-        page: 1,
-      });
-
-      const transactionsToExport = allTransactions.results || allTransactions;
-
-      if (transactionsToExport.length === 0) {
-        alert("Aucune transaction à exporter");
-        return;
+      if (filteredTransactions.length === 0) {
+        alert("Aucune transaction à exporter")
+        return
       }
 
-      // Créer les en-têtes CSV
       const headers = [
-        "ID Transaction",
-        "Référence",
-        "Date",
-        "Heure",
-        "Type",
-        "Montant",
-        "Statut",
-        "Carte",
-        "Client",
-        "Commerçant",
-        "Catégorie",
-        "Localisation",
-        "Frais",
-        "Solde avant",
-        "Solde après"
-      ];
-      // Créer les lignes de données
+        "ID Transaction", "Référence", "Date", "Heure", "Type",
+        "Montant", "Statut", "Carte", "Client", "Commerçant",
+        "Catégorie", "Localisation", "Frais", "Solde avant", "Solde après"
+      ]
 
-      interface ExportTransactionRow {
-        id: string;
-        reference_interne: string;
-        date: string;
-        time: string;
-        type: string;
-        montant: number | string;
-        statut: string;
-        carte: string;
-        client: string;
-        merchant_nom: string;
-        categorie: string;
-        localisation: string;
-        frais_transaction: number | string;
-        solde_avant: number | string;
-        solde_apres: number | string;
-      }
-
-      const rows: ExportTransactionRow[] = transactionsToExport.map((transaction: Transaction) => ({
+      const rows = filteredTransactions.map(transaction => ({
         id: transaction.id,
         reference_interne: transaction.reference_interne,
         date: formatDate(transaction.date_transaction),
@@ -281,42 +271,30 @@ export default function TransactionsPage() {
         frais_transaction: transaction.frais_transaction,
         solde_avant: transaction.solde_avant,
         solde_apres: transaction.solde_apres,
-      }));
+      }))
 
-      // Créer le contenu CSV
       const csvContent = [
         headers.join(";"),
         ...rows.map(row => Object.values(row).join(";"))
-      ].join("\n");
+      ].join("\n")
 
-      // Créer un blob et déclencher le téléchargement
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", `transactions_${new Date().toISOString().slice(0, 10)}.csv`);
-      link.style.visibility = "hidden";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.setAttribute("href", url)
+      link.setAttribute("download", `transactions_${new Date().toISOString().slice(0, 10)}.csv`)
+      link.style.visibility = "hidden"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
 
     } catch (error) {
-      console.error("Erreur lors de l'export:", error);
-      alert("Une erreur est survenue lors de l'export");
+      console.error("Erreur lors de l'export:", error)
+      alert("Une erreur est survenue lors de l'export")
     } finally {
-      setExporting(false);
+      setExporting(false)
     }
-  };
-
-  // Modifier le bouton pour afficher l'état de chargement
-  <Button variant="outline" onClick={exportTransactions} disabled={exporting}>
-    {exporting ? (
-      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-    ) : (
-      <Download className="h-4 w-4 mr-2" />
-    )}
-    {exporting ? "Export en cours..." : "Exporter"}
-  </Button>
+  }
 
   const formatAmount = (amount: number | string) => {
     const amountNumber = typeof amount === 'string' ? parseFloat(amount) : amount
@@ -356,9 +334,13 @@ export default function TransactionsPage() {
             <p className="text-gray-600">Suivez et gérez toutes les transactions effectuées avec RFID Pay</p>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" onClick={exportTransactions}>
-              <Download className="h-4 w-4 mr-2" />
-              Exporter
+            <Button variant="outline" onClick={exportTransactions} disabled={exporting}>
+              {exporting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              {exporting ? "Export en cours..." : "Exporter"}
             </Button>
             <Button>
               <Filter className="h-4 w-4 mr-2" />
@@ -476,13 +458,16 @@ export default function TransactionsPage() {
                   <Input
                     placeholder="Rechercher des transactions..."
                     value={searchTerm}
-                    onChange={(e) => handleSearch(e.target.value)}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <Select value={filters.statut} onValueChange={(value) => handleFilterChange("statut", value)}>
+                <Select
+                  value={filters.statut || "ALL"}
+                  onValueChange={(value) => handleFilterChange("statut", value)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Statut" />
                   </SelectTrigger>
@@ -496,7 +481,7 @@ export default function TransactionsPage() {
                 </Select>
 
                 <Select
-                  value={filters.type_transaction}
+                  value={filters.type_transaction || "ALL"}
                   onValueChange={(value) => handleFilterChange("type_transaction", value)}
                 >
                   <SelectTrigger>
@@ -513,14 +498,14 @@ export default function TransactionsPage() {
 
                 <Input
                   type="date"
-                  value={filters.date_debut}
+                  value={filters.date_debut || ""}
                   onChange={(e) => handleFilterChange("date_debut", e.target.value)}
                   placeholder="Date début"
                 />
 
                 <Input
                   type="date"
-                  value={filters.date_fin}
+                  value={filters.date_fin || ""}
                   onChange={(e) => handleFilterChange("date_fin", e.target.value)}
                   placeholder="Date fin"
                 />
@@ -553,40 +538,21 @@ export default function TransactionsPage() {
                   {loading ? (
                     Array.from({ length: 5 }).map((_, index) => (
                       <TableRow key={index}>
-                        <TableCell>
-                          <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                        </TableCell>
+                        {Array.from({ length: 8 }).map((_, i) => (
+                          <TableCell key={i}>
+                            <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                          </TableCell>
+                        ))}
                       </TableRow>
                     ))
-                  ) : transactions.length === 0 ? (
+                  ) : paginatedTransactions.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                         Aucune transaction trouvée
                       </TableCell>
                     </TableRow>
                   ) : (
-                    transactions.map((transaction) => {
+                    paginatedTransactions.map((transaction) => {
                       const status = statusConfig[transaction.statut]
                       const type = typeConfig[transaction.type_transaction]
                       const StatusIcon = status.icon
@@ -724,6 +690,7 @@ export default function TransactionsPage() {
                                           </div>
                                         </div>
                                       </div>
+
                                       {selectedTransaction.carte_receipt && (
                                         <div className="border-t pt-4">
                                           <h4 className="text-md font-medium text-gray-900 mb-3">
@@ -850,16 +817,18 @@ export default function TransactionsPage() {
             {/* Pagination */}
             <div className="flex items-center justify-between px-2 py-4">
               <div className="text-sm text-gray-700">
-                Affichage de <span className="font-medium">1</span> à{" "}
-                <span className="font-medium">{Math.min(filters.page_size || 10, transactions.length)}</span> sur{" "}
-                <span className="font-medium">{transactions.length}</span> résultats
+                Affichage de <span className="font-medium">{(filters.page - 1) * filters.page_size + 1}</span> à{" "}
+                <span className="font-medium">
+                  {Math.min(filters.page * filters.page_size, filteredTransactions.length)}
+                </span> sur{" "}
+                <span className="font-medium">{filteredTransactions.length}</span> résultats
               </div>
               <div className="flex items-center space-x-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setFilters((prev) => ({ ...prev, page: Math.max(1, (prev.page || 1) - 1) }))}
-                  disabled={(filters.page || 1) <= 1}
+                  onClick={() => setFilters(prev => ({ ...prev, page: prev.page - 1 }))}
+                  disabled={filters.page <= 1}
                 >
                   <ChevronLeft className="h-4 w-4" />
                   Précédent
@@ -867,8 +836,8 @@ export default function TransactionsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setFilters((prev) => ({ ...prev, page: (prev.page || 1) + 1 }))}
-                  disabled={transactions.length < (filters.page_size || 10)}
+                  onClick={() => setFilters(prev => ({ ...prev, page: prev.page + 1 }))}
+                  disabled={filters.page >= totalPages}
                 >
                   Suivant
                   <ChevronRight className="h-4 w-4" />
