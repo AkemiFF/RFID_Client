@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Modal from "@/components/ui/Modal"
 import StatusBadge from "@/components/ui/StatusBadge"
+import toast from "react-hot-toast"
 import {
   ArrowDownTrayIcon,
   BriefcaseIcon,
@@ -52,13 +53,13 @@ interface Client {
   type_piece?: string // CNI, PASSEPORT, PERMIS
   numero_piece?: string
   // Champs Entreprise
-  raison_sociale?: string // anciennement raisonSociale
+  raison_sociale?: string 
   forme_juridique?: string
   stat?: string
   nif?: string
-  tva_intracom?: string // anciennement tvaIntracom
-  secteur_activite?: string // anciennement secteurActivite
-  numero_rcs?: string // anciennement numeroRcs
+  tva_intracom?: string
+  secteur_activite?: string
+  numero_rcs?: string 
   date_creation_entreprise?: string
   // Champs communs
   email: string
@@ -100,10 +101,14 @@ export default function ClientsPage() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+  
+  const [showManageCardsModal, setShowManageCardsModal] = useState(false)
   const [addStep, setAddStep] = useState(1)
   const [selectedCards, setSelectedCards] = useState<string[]>([]) 
   const [searchCards, setSearchCards] = useState("")
   const [clientType, setClientType] = useState<"person" | "company">("person")
+  
+  const [isEditing, setIsEditing] = useState(false)
 
   const initialNewClientState = {
     // Personne
@@ -236,10 +241,14 @@ export default function ClientsPage() {
   }, [filters.search, filters.status, filters.clientType, filters.sortBy]) // Re-fetch si les filtres changent
 
   useEffect(() => {
-    if (showAddModal) {
-      fetchCartesDisponibles() // Charger les cartes quand le modal s'ouvre
+
+    if (showAddModal || showManageCardsModal) {
+
+      fetchCartesDisponibles()
+
     }
-  }, [showAddModal])
+
+  }, [showAddModal, showManageCardsModal])
 
   const openDetailsModal = (client: Client) => {
     setSelectedClient(client)
@@ -252,12 +261,60 @@ export default function ClientsPage() {
     setClientType("person")
     setSelectedCards([])
     setNewClient({ ...initialNewClientState, statut: "ACTIF" })
+      setIsEditing(false)
+
+  }
+
+
+
+  const openEditModal = (client: Client) => {
+
+    setSelectedClient(client)
+
+    setClientType(client.type)
+
+    setNewClient({
+
+      ...client,
+
+      statut: client.statut,
+
+    })
+
+    setIsEditing(true)
+
+    setShowAddModal(true)
+
+    setAddStep(1)
+
+  }
+
+
+
+  const openManageCardsModal = (client: Client) => {
+
+    setSelectedClient(client)
+
+    setSelectedCards(client.cartes_rfid_details?.map(c => c.id) || [])
+
+    setShowManageCardsModal(true)
+
   }
 
   const closeAddModal = () => {
     setShowAddModal(false)
     setAddStep(1)
     setSelectedCards([])
+    setIsEditing(false)
+
+  }
+
+  const closeManageCardsModal = () => {
+
+    setShowManageCardsModal(false)
+
+    setSelectedCards([])
+
   }
 
   const nextStep = () => {
@@ -284,64 +341,273 @@ export default function ClientsPage() {
     }))
   }
 
-  const handleSubmit = async () => {
+const handleSubmit = async () => {
+
     try {
+
+      if (isEditing) {
+
+        await handleUpdateClient()
+
+      } else {
+
         if (clientType === "person") {
+
           const formattedDate = newClient.date_naissance 
+
                 ? new Date(newClient.date_naissance).toISOString().split('T')[0]
-                : '';
-            const personneData: Partial<PersonneAPI> = {
-                nom: newClient.nom,
-                prenom: newClient.prenom,
-                date_naissance: formattedDate,
-                lieu_naissance: newClient.lieu_naissance,
-                nationalite: newClient.nationalite,
-                profession: newClient.profession,
-                type_piece: newClient.type_piece as PersonneAPI["type_piece"],
-                numero_piece: newClient.numero_piece,
-                telephone: newClient.telephone,
-                email: newClient.email,
-                adresse: newClient.adresse,
-                statut: newClient.statut as PersonneAPI["statut"],
-                carte_ids: selectedCards,
-            };
 
-            await identitesService.createPersonne(personneData);
-            alert("Personne créée avec succès !");
-            fetchClients();
-            closeAddModal();
+                : ''
+
+          const personneData: Partial<PersonneAPI> = {
+
+            nom: newClient.nom,
+
+            prenom: newClient.prenom,
+
+            date_naissance: formattedDate,
+
+            lieu_naissance: newClient.lieu_naissance,
+
+            nationalite: newClient.nationalite,
+
+            profession: newClient.profession,
+
+            type_piece: newClient.type_piece as PersonneAPI["type_piece"],
+
+            numero_piece: newClient.numero_piece,
+
+            telephone: newClient.telephone,
+
+            email: newClient.email,
+
+            adresse: newClient.adresse,
+
+            statut: newClient.statut as PersonneAPI["statut"],
+
+            carte_ids: selectedCards,
+
+          }
+
+
+
+          await identitesService.createPersonne(personneData)
+          toast.success("Personne créée avec succès !")
+
         } else {
+
           const formattedDate = newClient.date_creation_entreprise
+
                 ? new Date(newClient.date_creation_entreprise).toISOString().split('T')[0]
-                : '';
-            const entrepriseData: Partial<EntrepriseAPI> = {
-                raison_sociale: newClient.raison_sociale,
-                forme_juridique: newClient.forme_juridique,
-                stat: newClient.stat,
-                nif: newClient.nif,
-                tva_intracom: newClient.tva_intracom,
-                telephone: newClient.telephone,
-                email: newClient.email,
-                adresse_siege: newClient.adresse,
-                date_creation_entreprise: formattedDate,
-                secteur_activite: newClient.secteur_activite,
-                numero_rcs: newClient.numero_rcs,
-                statut: newClient.statut as EntrepriseAPI["statut"],
-                carte_ids: selectedCards,
-            };
 
-            await identitesService.createEntreprise(entrepriseData);
-            alert("Entreprise créée avec succès !");
-            fetchClients();
-            closeAddModal();
+                : ''
+
+          const entrepriseData: Partial<EntrepriseAPI> = {
+
+            raison_sociale: newClient.raison_sociale,
+
+            forme_juridique: newClient.forme_juridique,
+
+            stat: newClient.stat,
+
+            nif: newClient.nif,
+
+            tva_intracom: newClient.tva_intracom,
+
+            telephone: newClient.telephone,
+
+            email: newClient.email,
+
+            adresse_siege: newClient.adresse,
+
+            date_creation_entreprise: formattedDate,
+
+            secteur_activite: newClient.secteur_activite,
+
+            numero_rcs: newClient.numero_rcs,
+
+            statut: newClient.statut as EntrepriseAPI["statut"],
+
+            carte_ids: selectedCards,
+
+          }
+
+
+
+          await identitesService.createEntreprise(entrepriseData)
+
+          alert("Entreprise créée avec succès !")
+
         }
+
+        fetchClients()
+
+        closeAddModal()
+
+      }
+
     } catch (error) {
-        console.error("Erreur lors de la création du client:", error);
-        alert(`Erreur: ${error instanceof Error ? error.message : "Une erreur inconnue est survenue"}`);
+
+      console.error("Erreur lors de la création du client:", error)
+
+      alert(`Erreur: ${error instanceof Error ? error.message : "Une erreur inconnue est survenue"}`)
+
     }
-};
+
+  }
 
 
+
+  const handleUpdateClient = async () => {
+
+    try {
+
+      if (!selectedClient) return
+
+
+
+      if (clientType === "person") {
+
+        const formattedDate = newClient.date_naissance 
+
+          ? new Date(newClient.date_naissance).toISOString().split('T')[0]
+
+          : ''
+
+        
+
+        const personneData: Partial<PersonneAPI> = {
+
+          nom: newClient.nom,
+
+          prenom: newClient.prenom,
+
+          date_naissance: formattedDate,
+
+          lieu_naissance: newClient.lieu_naissance,
+
+          nationalite: newClient.nationalite,
+
+          profession: newClient.profession,
+
+          type_piece: newClient.type_piece as PersonneAPI["type_piece"],
+
+          numero_piece: newClient.numero_piece,
+
+          telephone: newClient.telephone,
+
+          email: newClient.email,
+
+          adresse: newClient.adresse,
+
+          statut: newClient.statut as PersonneAPI["statut"],
+
+        }
+
+
+
+        await identitesService.updatePersonne(selectedClient.id, personneData)
+        toast.success("Personne mise à jour avec succès !")
+        
+
+      } else {
+
+        const formattedDate = newClient.date_creation_entreprise
+
+          ? new Date(newClient.date_creation_entreprise).toISOString().split('T')[0]
+
+          : ''
+
+        
+
+        const entrepriseData: Partial<EntrepriseAPI> = {
+
+          raison_sociale: newClient.raison_sociale,
+
+          forme_juridique: newClient.forme_juridique,
+
+          stat: newClient.stat,
+
+          nif: newClient.nif,
+
+          tva_intracom: newClient.tva_intracom,
+
+          telephone: newClient.telephone,
+
+          email: newClient.email,
+
+          adresse_siege: newClient.adresse,
+
+          date_creation_entreprise: formattedDate,
+
+          secteur_activite: newClient.secteur_activite,
+
+          numero_rcs: newClient.numero_rcs,
+
+          statut: newClient.statut as EntrepriseAPI["statut"],
+
+        }
+
+
+
+        await identitesService.updateEntreprise(selectedClient.id, entrepriseData)
+        toast.success("Entreprise mise à jour avec succès !")
+
+      }
+
+
+
+      fetchClients()
+
+      closeAddModal()
+
+      setIsEditing(false)
+
+    } catch (error) {
+
+      console.error("Erreur lors de la mise à jour du client:", error)
+
+      alert(`Erreur: ${error instanceof Error ? error.message : "Une erreur inconnue est survenue"}`)
+
+    }
+
+  }
+
+
+  const handleAssignCards = async () => {
+
+    try {
+
+      if (!selectedClient) return
+
+
+
+      if (selectedClient.type === "person") {
+
+        await identitesService.assignCartesToPersonne(selectedClient.id, selectedCards)
+
+      } else {
+
+        await identitesService.assignCartesToEntreprise(selectedClient.id, selectedCards)
+
+      }
+
+
+      toast.success("Cartes assignées avec succès !")
+
+      fetchClients()
+
+      setShowManageCardsModal(false)
+
+    } catch (error) {
+
+      console.error("Erreur lors de l'assignation des cartes:", error)
+
+      alert(`Erreur: ${error instanceof Error ? error.message : "Une erreur inconnue est survenue"}`)
+
+    }
+
+  }
 
   const filteredCardsForModal = cartesDisponibles.filter(
     (carte) =>
@@ -523,10 +789,10 @@ export default function ClientsPage() {
                           <Button variant="ghost" size="sm" onClick={() => openDetailsModal(client)}>
                             <EyeIcon className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" title="Modifier (Non implémenté)">
+                          <Button variant="ghost" size="sm" onClick={() => openEditModal(client)}> 
                             <PencilIcon className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" title="Gérer cartes (Non implémenté)">
+                          <Button variant="ghost" size="sm" onClick={() => openManageCardsModal(client)}>
                             <CreditCardIcon className="h-4 w-4" />
                           </Button>
                         </div>
@@ -548,7 +814,7 @@ export default function ClientsPage() {
       <Modal
         isOpen={showAddModal}
         onClose={closeAddModal}
-        title={`Ajouter un nouveau client - Étape ${addStep}/2`}
+        title={`${isEditing ? 'Modifier' : 'Ajouter'} un client - Étape ${addStep}/2`}
         size="lg"
       >
         <div className="space-y-6">
@@ -564,12 +830,14 @@ export default function ClientsPage() {
                   <Button
                     variant={clientType === "person" ? "default" : "outline"}
                     onClick={() => handleClientTypeChange("person")}
+                    disabled={isEditing}
                   >
                     Personne physique
                   </Button>
                   <Button
                     variant={clientType === "company" ? "default" : "outline"}
                     onClick={() => handleClientTypeChange("company")}
+                    disabled={isEditing}
                   >
                     Entreprise
                   </Button>
@@ -640,7 +908,7 @@ export default function ClientsPage() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="lieu_naissance">Lieu de naissance *</Label>
+                      <Label htmlFor="lieu_naissance">Lieu de naissance </Label>
                       <Input
                         id="lieu_naissance"
                         placeholder="Lieu de naissance"
@@ -658,8 +926,8 @@ export default function ClientsPage() {
                         onChange={(e) => setNewClient((prev) => ({ ...prev, nationalite: e.target.value }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                       >
-                        <option value="Française">Française</option>
                         <option value="Malgache">Malgache</option>
+                        <option value="Française">Française</option>
                         <option value="Étrangère">Autre étrangère</option>
                       </select>
                     </div>
@@ -801,7 +1069,7 @@ export default function ClientsPage() {
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="date_creation_entreprise">Date de création entreprise *</Label>
+                    <Label htmlFor="date_creation_entreprise">Date de création entreprise </Label>
                     <Input
                       id="date_creation_entreprise"
                       type="date"
@@ -927,13 +1195,181 @@ export default function ClientsPage() {
                   <ChevronRightIcon className="h-4 w-4 ml-2" />
                 </Button>
               ) : (
-                <Button onClick={handleSubmit}>Créer le client</Button>
+                <Button onClick={handleSubmit}>
+
+                  {isEditing ? 'Mettre à jour' : 'Créer le client'}
+
+                </Button>
               )}
             </div>
           </div>
         </div>
       </Modal>
+      {/* Manage Cards Modal */}
 
+      <Modal
+
+        isOpen={showManageCardsModal}
+
+        onClose={closeManageCardsModal}
+
+        title={`Gérer les cartes RFID - ${selectedClient?.type === "person" ? `${selectedClient?.prenom} ${selectedClient?.nom}` : selectedClient?.raison_sociale}`}
+
+        size="lg"
+
+      >
+
+        <div className="space-y-4">
+
+          <div className="flex items-center justify-between">
+
+            <h4 className="text-lg font-medium text-gray-900">Assigner des cartes RFID</h4>
+
+            <div className="text-sm text-gray-500">
+
+              {selectedCards.length} carte(s) sélectionnée(s) sur {selectedClient?.cartes_rfid_details?.length || 0} déjà assignées
+
+            </div>
+
+          </div>
+
+          <div className="relative">
+
+            <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+
+            <Input
+
+              placeholder="Rechercher une carte (UID, N° Série)..."
+
+              value={searchCards}
+
+              onChange={(e) => setSearchCards(e.target.value)}
+
+              className="pl-10"
+
+            />
+
+          </div>
+
+          {loadingCartes && <div className="text-center py-8 text-gray-500">Chargement des cartes...</div>}
+
+          {!loadingCartes && (
+
+            <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg">
+
+              {filteredCardsForModal.map((carte) => (
+
+                <div
+
+                  key={carte.id}
+
+                  className={`p-4 border-b border-gray-200 last:border-b-0 hover:bg-gray-50 cursor-pointer ${selectedCards.includes(carte.id) ? "bg-purple-50 border-purple-200" : ""}`}
+
+                  onClick={() => toggleCardSelection(carte.id)}
+
+                >
+
+                  <div className="flex items-center justify-between">
+
+                    <div className="flex items-center space-x-3">
+
+                      <input
+
+                        type="checkbox"
+
+                        checked={selectedCards.includes(carte.id)}
+
+                        onChange={() => toggleCardSelection(carte.id)}
+
+                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+
+                      />
+
+                      <div className="flex-1">
+
+                        <div className="flex items-center space-x-2">
+
+                          <span className="text-sm font-medium text-gray-900">{carte.code_uid}</span>
+
+                          <span
+
+                            className={`px-2 py-1 text-xs rounded-full ${carte.type_carte === "STANDARD" ? "bg-blue-100 text-blue-800" : carte.type_carte === "PREMIUM" ? "bg-purple-100 text-purple-800" : "bg-yellow-100 text-yellow-800"}`}
+
+                          >
+
+                            {carte.type_carte}
+
+                          </span>
+
+                        </div>
+
+                        <div className="text-xs text-gray-500 mt-1">
+
+                          SN: {carte.numero_serie} • Expire: {carte.date_expiration || "N/A"}
+
+                        </div>
+
+                      </div>
+
+                    </div>
+
+                    <div className="text-right">
+
+                      {carte.plafond_quotidien && (
+
+                        <div className="text-sm text-gray-900">Plafond: €{carte.plafond_quotidien}/jour</div>
+
+                      )}
+
+                      {carte.solde_maximum && (
+
+                        <div className="text-xs text-gray-500">Max: €{carte.solde_maximum}</div>
+
+                      )}
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+              ))}
+
+            </div>
+
+          )}
+
+          {!loadingCartes && filteredCardsForModal.length === 0 && (
+
+            <div className="text-center py-8 text-gray-500">
+
+              <CreditCardIcon className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+
+              <p>Aucune carte disponible trouvée pour les critères actuels.</p>
+
+            </div>
+
+          )}
+
+        </div>
+
+        <div className="flex justify-end pt-6 border-t border-gray-200">
+
+          <div className="flex space-x-3">
+
+            <Button variant="outline" onClick={closeManageCardsModal}>
+
+              Annuler
+
+            </Button>
+
+            <Button onClick={handleAssignCards}>Enregistrer les modifications</Button>
+
+          </div>
+
+        </div>
+
+      </Modal>
       {/* Client Detail Modal (Adaptation des champs) */}
       <Modal isOpen={showDetailsModal} onClose={() => setShowDetailsModal(false)} title="Détails du client" size="lg">
         {selectedClient && (
