@@ -1,5 +1,5 @@
 import api from "../api"
-
+import { apiAdmin } from "../api-service"
 export interface Entreprise {
   id: string
   raison_sociale: string
@@ -50,17 +50,17 @@ export interface AssignCarteData {
 
 class EntreprisesService {
   async getEntreprises(filters: EntrepriseFilters = {}) {
-    const response = await api.get("/identites/entreprises/", { params: filters })
+    const response = await apiAdmin.get("/identites/entreprises/", { params: filters })
     return response.data
   }
 
   async getEntreprise(id: string) {
-    const response = await api.get(`/identites/entreprises/${id}/`)
+    const response = await apiAdmin.get(`/identites/entreprises/${id}/`)
     return response.data
   }
 
   async createEntreprise(data: CreateEntrepriseData) {
-    const response = await api.post("/identites/entreprises/", data)
+    const response = await apiAdmin.post("/identites/entreprises/", data)
     return response.data
   }
 
@@ -74,12 +74,12 @@ class EntreprisesService {
   }
 
   async getEntrepriseCartes(id: string) {
-    const response = await api.get(`/identites/entreprises/${id}/cartes/`)
+    const response = await apiAdmin.get(`/identites/entreprises/${id}/cartes/`)
     return response.data
   }
 
   async assignCartes(data: AssignCarteData) {
-    const response = await api.post("/identites/entreprises/assign-cartes/", data)
+    const response = await apiAdmin.post("/identites/entreprises/assign-cartes/", data)
     return response.data
   }
 
