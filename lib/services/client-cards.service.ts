@@ -3,8 +3,8 @@ import { apiAdmin } from "../api-service"
 export interface ClientCard {
   id: string
   numero: string
-  type: "standard" | "premium" | "business"
-  statut: "active" | "bloquee" | "suspendue" | "expiree"
+  type: "STANDARD" | "PREMIUM" | "ENTREPRISE"
+  statut: "ACTIVE" | "BLOQUEE" | "EXPIREE" | "PERDUE" | "VOLEE"
   solde: number
   dateCreation: string
   dateExpiration: string
@@ -60,6 +60,14 @@ export interface CardSettings {
   }
 }
 
+export interface CardStatistics {
+  totalTransactions: number
+  totalAmount: number
+  averageTransaction: number
+  topMerchants: Array<{ name: string; amount: number; count: number }>
+  dailyUsage: Array<{ date: string; amount: number; count: number }>
+}
+
 class ClientCardsService {
   async getCards(): Promise<ClientCard[]> {
     try {
@@ -81,7 +89,7 @@ class ClientCardsService {
 
   async blockCard(cardId: string, reason: string): Promise<void> {
     try {
-      await apiClient.post(`/client/cards/${cardId}/block`, { reason })
+      await apiClient.post(`/cartes/client/cards/${cardId}/block/`, { reason })
     } catch (error) {
       throw new Error("Impossible de bloquer la carte")
     }
@@ -89,7 +97,7 @@ class ClientCardsService {
 
   async unblockCard(cardId: string): Promise<void> {
     try {
-      await apiClient.post(`/client/cards/${cardId}/unblock`)
+      await apiClient.post(`/cartes/client/cards/${cardId}/unblock/`)
     } catch (error) {
       throw new Error("Impossible de débloquer la carte")
     }
@@ -97,7 +105,7 @@ class ClientCardsService {
 
   async activateCard(cardId: string, pin: string): Promise<void> {
     try {
-      await apiClient.post(`/client/cards/${cardId}/activate`, { pin })
+      await apiClient.post(`/cartes/client/cards/${cardId}/activate/`, { pin })
     } catch (error) {
       throw new Error("Impossible d'activer la carte")
     }
@@ -105,7 +113,7 @@ class ClientCardsService {
 
   async changePIN(cardId: string, currentPin: string, newPin: string): Promise<void> {
     try {
-      await apiClient.post(`/client/cards/${cardId}/change-pin`, {
+      await apiClient.post(`/cartes/client/cards/${cardId}/change_pin/`, {
         currentPin,
         newPin,
       })
@@ -116,7 +124,7 @@ class ClientCardsService {
 
   async updateLimits(cardId: string, limits: CardLimits): Promise<void> {
     try {
-      await apiClient.put(`/client/cards/${cardId}/limits`, limits)
+      await apiClient.put(`/cartes/client/cards/${cardId}/limits/`, limits)
     } catch (error) {
       throw new Error("Impossible de modifier les limites")
     }
@@ -124,7 +132,7 @@ class ClientCardsService {
 
   async updateSettings(cardId: string, settings: CardSettings): Promise<void> {
     try {
-      await apiClient.put(`/client/cards/${cardId}/settings`, settings)
+      await apiClient.put(`/cartes/client/cards/${cardId}/settings/`, settings)
     } catch (error) {
       throw new Error("Impossible de modifier les paramètres")
     }
@@ -141,7 +149,7 @@ class ClientCardsService {
     totalPages: number
   }> {
     try {
-      const response = await apiClient.get(`/client/cards/${cardId}/transactions?page=${page}&limit=${limit}`)
+      const response = await apiClient.get(`/cartes/client/cards/${cardId}/transactions/?page=${page}&limit=${limit}`)
       return response.data
     } catch (error) {
       throw new Error("Impossible de récupérer l'historique de la carte")
@@ -150,7 +158,7 @@ class ClientCardsService {
 
   async requestNewCard(request: CardRequest): Promise<{ requestId: string; estimatedDelivery: string }> {
     try {
-      const response = await apiClient.post("/client/cards/request", request)
+      const response = await apiClient.post("/cartes/client/cards/request/", request)
       return response.data
     } catch (error) {
       throw new Error("Impossible de demander une nouvelle carte")
@@ -159,7 +167,7 @@ class ClientCardsService {
 
   async reportLostCard(cardId: string, circumstances: string): Promise<void> {
     try {
-      await apiClient.post(`/client/cards/${cardId}/report-lost`, { circumstances })
+      await apiClient.post(`/cartes/client/cards/${cardId}/report_lost/`, { circumstances })
     } catch (error) {
       throw new Error("Impossible de signaler la perte")
     }
@@ -167,25 +175,16 @@ class ClientCardsService {
 
   async requestReplacement(cardId: string, reason: string): Promise<{ requestId: string; cost: number }> {
     try {
-      const response = await apiClient.post(`/client/cards/${cardId}/replace`, { reason })
+      const response = await apiClient.post(`/cartes/client/cards/${cardId}/replace/`, { reason })
       return response.data
     } catch (error) {
       throw new Error("Impossible de demander un remplacement")
     }
   }
 
-  async getCardStatistics(
-    cardId: string,
-    period: "week" | "month" | "year",
-  ): Promise<{
-    totalTransactions: number
-    totalAmount: number
-    averageTransaction: number
-    topMerchants: Array<{ name: string; amount: number; count: number }>
-    dailyUsage: Array<{ date: string; amount: number; count: number }>
-  }> {
+  async getCardStatistics(cardId: string, period: "week" | "month" | "year"): Promise<CardStatistics> {
     try {
-      const response = await apiClient.get(`/client/cards/${cardId}/statistics?period=${period}`)
+      const response = await apiClient.get(`/cartes/client/cards/${cardId}/statistics/?period=${period}`)
       return response.data
     } catch (error) {
       throw new Error("Impossible de récupérer les statistiques")
@@ -194,32 +193,43 @@ class ClientCardsService {
 
   // Méthodes utilitaires
   getCardTypeLabel(type: string): string {
-    const labels = {
-      standard: "Standard",
-      premium: "Premium",
-      business: "Business",
+    const labels: Record<string, string> = {
+      STANDARD: "Standard",
+      PREMIUM: "Premium",
+      ENTREPRISE: "Business",
     }
-    return labels[type as keyof typeof labels] || type
+    return labels[type] || type
   }
 
   getCardStatusLabel(status: string): string {
-    const labels = {
-      active: "Active",
-      bloquee: "Bloquée",
-      suspendue: "Suspendue",
-      expiree: "Expirée",
+    const labels: Record<string, string> = {
+      ACTIVE: "Active",
+      BLOQUEE: "Bloquée",
+      EXPIREE: "Expirée",
+      PERDUE: "Perdue",
+      VOLEE: "Volée",
     }
-    return labels[status as keyof typeof labels] || status
+    return labels[status] || status
   }
 
   getCardStatusColor(status: string): string {
-    const colors = {
-      active: "bg-green-100 text-green-800",
-      bloquee: "bg-red-100 text-red-800",
-      suspendue: "bg-yellow-100 text-yellow-800",
-      expiree: "bg-gray-100 text-gray-800",
+    const colors: Record<string, string> = {
+      ACTIVE: "bg-green-100 text-green-800",
+      BLOQUEE: "bg-red-100 text-red-800",
+      EXPIREE: "bg-gray-100 text-gray-800",
+      PERDUE: "bg-yellow-100 text-yellow-800",
+      VOLEE: "bg-orange-100 text-orange-800",
     }
-    return colors[status as keyof typeof colors] || "bg-gray-100 text-gray-800"
+    return colors[status] || "bg-gray-100 text-gray-800"
+  }
+
+  getCardTypeColor(type: string): string {
+    const colors: Record<string, string> = {
+      STANDARD: "bg-gray-100 text-gray-800",
+      PREMIUM: "bg-amber-100 text-amber-800",
+      ENTREPRISE: "bg-emerald-100 text-emerald-800",
+    }
+    return colors[type] || "bg-gray-100 text-gray-800"
   }
 
   formatCardNumber(numero: string): string {
@@ -240,6 +250,23 @@ class ClientCardsService {
 
   formatAmount(amount: number): string {
     return new Intl.NumberFormat("fr-FR").format(amount) + " Ar"
+  }
+
+  formatDate(date: string): string {
+    return new Date(date).toLocaleDateString("fr-FR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })
+  }
+
+  getCardIcon(type: string): string {
+    const icons: Record<string, string> = {
+      STANDARD: "credit-card",
+      PREMIUM: "credit-card",
+      ENTREPRISE: "building",
+    }
+    return icons[type] || "credit-card"
   }
 }
 
