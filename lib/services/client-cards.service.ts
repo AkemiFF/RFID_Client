@@ -1,5 +1,6 @@
 import api from "@/lib/api"
 import { apiAdmin } from "../api-service"
+import  apiClient from "../api-service"
 export interface ClientCard {
   id: string
   numero: string
