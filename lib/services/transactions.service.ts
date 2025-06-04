@@ -51,11 +51,8 @@ export interface TransactionFilters {
 
 class TransactionsService {
   async getTransactions(filters: TransactionFilters = {}) {
-<<<<<<< HEAD
-    const response = await apiClient.get("/transactions/transactions/", { params: filters })
-=======
     const response = await apiAdmin.get("/transactions/transactions/", { params: filters })
->>>>>>> origin/Leomyre
+
     return response.data
   }
 
