@@ -18,6 +18,11 @@ export interface Personne {
   cartes_rfid_details?: any[]
   nombre_cartes?: number
   date_creation: string
+  user_data?: {
+    username: string
+    password: string
+    role: string
+  }
 }
 
 export interface Entreprise {
@@ -38,6 +43,11 @@ export interface Entreprise {
   nombre_cartes?: number
   date_creation: string
   carte_ids?: string[]
+  user_data?: {
+    username: string
+    password: string
+    role: string
+  }
 }
 
 class IdentitesService {
@@ -159,7 +169,6 @@ class IdentitesService {
         "nom",
         "prenom",
         "date_naissance",
-        "lieu_naissance",
         "nationalite",
         "type_piece",
         "numero_piece",
@@ -244,17 +253,16 @@ class IdentitesService {
       if (missingFields.length > 0) {
         throw new Error(`Champs obligatoires manquants: ${missingFields.join(", ")}`)
       }
+
       const formattedData = {
         ...data,
-        date_naissance: data.date_creation_entreprise
+        date_creation_entreprise: data.date_creation_entreprise
           ? new Date(data.date_creation_entreprise).toISOString().split("T")[0]
           : null,
         carte_ids: data.carte_ids || [],
       }
-      const response = await apiAdmin.post("/identites/entreprises/", {
-        ...data,
-        carte_ids: data.carte_ids || [],
-      })
+
+      const response = await apiAdmin.post("/identites/entreprises/", formattedData)
       return response.data
     } catch (error) {
       console.error("Erreur lors de la création de l'entreprise:", error)

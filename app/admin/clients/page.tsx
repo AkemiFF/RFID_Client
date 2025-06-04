@@ -27,70 +27,64 @@ import {
   PlusIcon,
   TagIcon,
   UserIcon,
+  EyeSlashIcon,
 } from "@heroicons/react/24/outline"
 import { useState, useEffect } from "react"
 
-// Services API (assurez-vous que les chemins d'import sont corrects)
-
+// Services API
 import {
   identitesService,
   type Personne as PersonneAPI,
   type Entreprise as EntrepriseAPI,
-} from "@/lib/services/identites.service" // Ajustez le chemin
-import { cartesService, type CarteDisponibleAPI } from "@/lib/services/cartes.service" // Ajustez le chemin
+} from "@/lib/services/identites.service"
+import { cartesService, type CarteDisponibleAPI } from "@/lib/services/cartes.service"
 
 // Interface Client unifiée pour le frontend
 interface Client {
   id: string
   type: "person" | "company"
   // Champs Personne
-  prenom?: string // anciennement firstName
-  nom?: string // anciennement lastName
+  prenom?: string
+  nom?: string
   date_naissance?: string
   lieu_naissance?: string
   nationalite?: string
   profession?: string
-  type_piece?: string // CNI, PASSEPORT, PERMIS
+  type_piece?: string
   numero_piece?: string
   // Champs Entreprise
-  raison_sociale?: string 
+  raison_sociale?: string
   forme_juridique?: string
   stat?: string
   nif?: string
   tva_intracom?: string
   secteur_activite?: string
-  numero_rcs?: string 
+  numero_rcs?: string
   date_creation_entreprise?: string
   // Champs communs
   email: string
-  telephone: string 
+  telephone: string
   adresse: string
-  adresse_siege: string 
-  ville?: string 
-  code_postal?: string 
+  adresse_siege: string
+  ville?: string
+  code_postal?: string
   // Champs du backend pour affichage
   cartes_rfid_details?: { id: string; code_uid: string; numero_serie: string; type_carte: string; statut: string }[]
   nombre_cartes?: number
-  date_creation: string 
+  date_creation: string
   statut: "ACTIF" | "INACTIF" | "SUSPENDU" | "ACTIVE" | "INACTIVE" | "SUSPENDUE"
-
 }
 
-// Interface pour les cartes disponibles dans le modal, alignée avec CarteDisponibleAPI
-interface CarteDisponible extends CarteDisponibleAPI {}
+// Interface pour les données utilisateur
+interface UserData {
+  username: string
+  password: string
+  confirmPassword: string
+  role: string
+}
 
-const recentTransactions = [
-  // Gardé pour l'exemple, à remplacer par des données réelles si besoin
-  {
-    clientName: "Jean Dupont",
-    description: "Achat billet concert Coldplay",
-    amount: "+€89.00",
-    date: "15/07/2023 14:32",
-    cardId: "RFID-7894",
-    type: "ticket",
-  },
-  // ... autres transactions ...
-]
+// Interface pour les cartes disponibles
+interface CarteDisponible extends CarteDisponibleAPI {}
 
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([])
@@ -101,14 +95,15 @@ export default function ClientsPage() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
-  
   const [showManageCardsModal, setShowManageCardsModal] = useState(false)
+
   const [addStep, setAddStep] = useState(1)
-  const [selectedCards, setSelectedCards] = useState<string[]>([]) 
+  const [selectedCards, setSelectedCards] = useState<string[]>([])
   const [searchCards, setSearchCards] = useState("")
   const [clientType, setClientType] = useState<"person" | "company">("person")
-  
   const [isEditing, setIsEditing] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const initialNewClientState = {
     // Personne
@@ -116,9 +111,9 @@ export default function ClientsPage() {
     nom: "",
     date_naissance: "",
     lieu_naissance: "",
-    nationalite: "Française", // Default
+    nationalite: "Malgache",
     profession: "",
-    type_piece: "CNI", // Default
+    type_piece: "CNI",
     numero_piece: "",
     // Entreprise
     raison_sociale: "",
@@ -132,30 +127,32 @@ export default function ClientsPage() {
     // Commun
     email: "",
     telephone: "",
-    adresse: "", 
-    status: "ACTIF", 
+    adresse: "",
+    status: "ACTIF",
   }
+
+  const initialUserData: UserData = {
+    username: "",
+    password: "",
+    confirmPassword: "",
+    role: "CLIENT",
+  }
+
   const [newClient, setNewClient] = useState<Partial<Client>>(initialNewClientState)
+  const [userData, setUserData] = useState<UserData>(initialUserData)
 
   const [filters, setFilters] = useState({
     status: "all",
     clientType: "all",
-    sortBy: "registration", 
+    sortBy: "registration",
     search: "",
   })
 
   const fetchClients = async () => {
     setLoadingClients(true)
     try {
-      const personnesPromise = identitesService.getPersonnes({
-        // Ajoutez ici les filtres si l'API les supporte pour la recherche initiale
-        // search: filters.search,
-        // statut: filters.status !== "all" ? filters.status : undefined,
-      })
-      const entreprisesPromise = identitesService.getEntreprises({
-        // search: filters.search,
-        // statut: filters.status !== "all" ? filters.status : undefined,
-      })
+      const personnesPromise = identitesService.getPersonnes({})
+      const entreprisesPromise = identitesService.getEntreprises({})
 
       const [personnesRes, entreprisesRes] = await Promise.all([personnesPromise, entreprisesPromise])
 
@@ -163,20 +160,18 @@ export default function ClientsPage() {
         ...p,
         id: p.id,
         type: "person",
-    
       }))
 
       const fetchedEntreprises: Client[] = (entreprisesRes.results || entreprisesRes).map((e: EntrepriseAPI) => ({
         ...e,
         id: e.id,
         type: "company",
-        adresse: e.adresse_siege, 
-        // rfidCards: e.cartes_rfid_details?.map(c => c.code_uid) || [],
+        adresse: e.adresse_siege,
       }))
 
       let combinedClients = [...fetchedPersonnes, ...fetchedEntreprises]
 
-      // Filtrage côté client (si non fait côté serveur pour la recherche globale)
+      // Filtrage côté client
       if (filters.search) {
         combinedClients = combinedClients.filter((client) =>
           `${client.prenom || ""} ${client.nom || ""} ${client.raison_sociale || ""} ${client.email || ""}`
@@ -193,7 +188,7 @@ export default function ClientsPage() {
         combinedClients = combinedClients.filter((client) => client.type === filters.clientType)
       }
 
-      // Tri (exemple simple, à améliorer)
+      // Tri
       if (filters.sortBy === "registration") {
         combinedClients.sort((a, b) => new Date(b.date_creation).getTime() - new Date(a.date_creation).getTime())
       } else if (filters.sortBy === "name") {
@@ -207,7 +202,7 @@ export default function ClientsPage() {
       setClients(combinedClients)
     } catch (error) {
       console.error("Erreur lors de la récupération des clients:", error)
-      // Gérer l'erreur, afficher un message à l'utilisateur
+      toast.error("Erreur lors du chargement des clients")
     } finally {
       setLoadingClients(false)
     }
@@ -217,13 +212,10 @@ export default function ClientsPage() {
     setLoadingCartes(true)
     try {
       const cartes = await cartesService.getCartesDisponibles()
-      // Mapper si nécessaire pour correspondre à l'interface CarteDisponible du frontend
       setCartesDisponibles(
         cartes.map((c) => ({
           ...c,
-          // Assurez-vous que les champs de l'interface CarteDisponible sont présents
-          // Si plafond_quotidien etc. ne viennent pas de l'API, mettez des valeurs par défaut ou rendez les optionnels
-          plafond_quotidien: c.plafond_quotidien || 0, // Exemple de valeur par défaut
+          plafond_quotidien: c.plafond_quotidien || 0,
           plafond_mensuel: c.plafond_mensuel || 0,
           solde_maximum: c.solde_maximum || 0,
           date_expiration: c.date_expiration || "N/A",
@@ -231,6 +223,7 @@ export default function ClientsPage() {
       )
     } catch (error) {
       console.error("Erreur lors de la récupération des cartes disponibles:", error)
+      toast.error("Erreur lors du chargement des cartes")
     } finally {
       setLoadingCartes(false)
     }
@@ -238,16 +231,12 @@ export default function ClientsPage() {
 
   useEffect(() => {
     fetchClients()
-  }, [filters.search, filters.status, filters.clientType, filters.sortBy]) // Re-fetch si les filtres changent
+  }, [filters.search, filters.status, filters.clientType, filters.sortBy])
 
   useEffect(() => {
-
     if (showAddModal || showManageCardsModal) {
-
       fetchCartesDisponibles()
-
     }
-
   }, [showAddModal, showManageCardsModal])
 
   const openDetailsModal = (client: Client) => {
@@ -261,44 +250,26 @@ export default function ClientsPage() {
     setClientType("person")
     setSelectedCards([])
     setNewClient({ ...initialNewClientState, statut: "ACTIF" })
-      setIsEditing(false)
-
+    setUserData(initialUserData)
+    setIsEditing(false)
   }
-
-
 
   const openEditModal = (client: Client) => {
-
     setSelectedClient(client)
-
     setClientType(client.type)
-
     setNewClient({
-
       ...client,
-
       statut: client.statut,
-
     })
-
     setIsEditing(true)
-
     setShowAddModal(true)
-
     setAddStep(1)
-
   }
 
-
-
   const openManageCardsModal = (client: Client) => {
-
     setSelectedClient(client)
-
-    setSelectedCards(client.cartes_rfid_details?.map(c => c.id) || [])
-
+    setSelectedCards(client.cartes_rfid_details?.map((c) => c.id) || [])
     setShowManageCardsModal(true)
-
   }
 
   const closeAddModal = () => {
@@ -306,20 +277,71 @@ export default function ClientsPage() {
     setAddStep(1)
     setSelectedCards([])
     setIsEditing(false)
-
+    setNewClient(initialNewClientState)
+    setUserData(initialUserData)
   }
 
   const closeManageCardsModal = () => {
-
     setShowManageCardsModal(false)
-
     setSelectedCards([])
-
   }
 
   const nextStep = () => {
-    // TODO: Ajouter validation des champs de l'étape 1 avant de passer à la suite
-    if (addStep < 2) setAddStep(addStep + 1)
+    // Validation avant de passer à l'étape suivante
+    if (addStep === 1) {
+      // Validation des champs obligatoires de l'identité
+      if (clientType === "person") {
+        if (
+          !newClient.nom ||
+          !newClient.prenom ||
+          !newClient.email ||
+          !newClient.date_naissance ||
+          !newClient.numero_piece
+        ) {
+          toast.error("Veuillez remplir tous les champs obligatoires")
+          return
+        }
+      } else {
+        if (!newClient.raison_sociale || !newClient.email || !newClient.stat || !newClient.nif) {
+          toast.error("Veuillez remplir tous les champs obligatoires")
+          return
+        }
+      }
+
+      // Générer un nom d'utilisateur par défaut basé sur l'email ou le nom
+      if (!isEditing) {
+        const emailPrefix = newClient.email?.split("@")[0] || ""
+        const defaultUsername =
+          emailPrefix ||
+          (clientType === "person"
+            ? `${newClient.prenom?.toLowerCase() || ""}${newClient.nom?.toLowerCase() || ""}`
+            : newClient.raison_sociale?.toLowerCase().replace(/\s+/g, "") || "")
+
+        setUserData((prev) => ({
+          ...prev,
+          username: defaultUsername,
+          role: "CLIENT", // Forcer le rôle CLIENT
+        }))
+      }
+    }
+
+    if (addStep === 2 && !isEditing) {
+      // Validation des champs utilisateur
+      if (!userData.username || !userData.password || !userData.confirmPassword) {
+        toast.error("Veuillez remplir tous les champs utilisateur")
+        return
+      }
+      if (userData.password !== userData.confirmPassword) {
+        toast.error("Les mots de passe ne correspondent pas")
+        return
+      }
+      if (userData.password.length < 6) {
+        toast.error("Le mot de passe doit contenir au moins 6 caractères")
+        return
+      }
+    }
+
+    if (addStep < (isEditing ? 2 : 3)) setAddStep(addStep + 1)
   }
 
   const prevStep = () => {
@@ -333,280 +355,195 @@ export default function ClientsPage() {
   const handleClientTypeChange = (type: "person" | "company") => {
     setClientType(type)
     setNewClient((prev) => ({
-      ...initialNewClientState, // Réinitialiser les champs spécifiques
-      email: prev.email, // Conserver les champs communs si déjà saisis
+      ...initialNewClientState,
+      email: prev.email,
       telephone: prev.telephone,
       adresse: prev.adresse,
-      statut: type === "person" ? "ACTIF" : "ACTIVE", // Ajuster le statut par défaut
+      statut: type === "person" ? "ACTIF" : "ACTIVE",
     }))
   }
 
-const handleSubmit = async () => {
-
+  const handleSubmit = async () => {
     try {
-
       if (isEditing) {
-
         await handleUpdateClient()
-
       } else {
-
         if (clientType === "person") {
-
-          const formattedDate = newClient.date_naissance 
-
-                ? new Date(newClient.date_naissance).toISOString().split('T')[0]
-
-                : ''
+          const formattedDate = newClient.date_naissance
+            ? new Date(newClient.date_naissance).toISOString().split("T")[0]
+            : ""
 
           const personneData: Partial<PersonneAPI> = {
-
             nom: newClient.nom,
-
             prenom: newClient.prenom,
-
             date_naissance: formattedDate,
-
             lieu_naissance: newClient.lieu_naissance,
-
             nationalite: newClient.nationalite,
-
             profession: newClient.profession,
-
             type_piece: newClient.type_piece as PersonneAPI["type_piece"],
-
             numero_piece: newClient.numero_piece,
-
             telephone: newClient.telephone,
-
             email: newClient.email,
-
             adresse: newClient.adresse,
-
             statut: newClient.statut as PersonneAPI["statut"],
-
             carte_ids: selectedCards,
-
+            // Données utilisateur
+            user_data: {
+              username: userData.username,
+              password: userData.password,
+              role: "CLIENT", // Forcer le rôle CLIENT
+            },
           }
-
-
 
           await identitesService.createPersonne(personneData)
-          toast.success("Personne créée avec succès !")
-
+          toast.success("Personne et utilisateur créés avec succès !")
         } else {
-
           const formattedDate = newClient.date_creation_entreprise
+            ? new Date(newClient.date_creation_entreprise).toISOString().split("T")[0]
+            : ""
 
-                ? new Date(newClient.date_creation_entreprise).toISOString().split('T')[0]
-
-                : ''
+          // Afficher les données pour le débogage
+          console.log("Données entreprise à envoyer:", {
+            raison_sociale: newClient.raison_sociale,
+            forme_juridique: newClient.forme_juridique,
+            stat: newClient.stat,
+            nif: newClient.nif,
+            email: newClient.email,
+            adresse_siege: newClient.adresse,
+            user_data: {
+              username: userData.username,
+              password: userData.password,
+              role: "CLIENT",
+            },
+          })
 
           const entrepriseData: Partial<EntrepriseAPI> = {
-
             raison_sociale: newClient.raison_sociale,
-
             forme_juridique: newClient.forme_juridique,
-
             stat: newClient.stat,
-
             nif: newClient.nif,
-
             tva_intracom: newClient.tva_intracom,
-
             telephone: newClient.telephone,
-
             email: newClient.email,
-
             adresse_siege: newClient.adresse,
-
-            date_creation_entreprise: formattedDate,
-
-            secteur_activite: newClient.secteur_activite,
-
+            date_creation_entreprise: formattedDate || undefined,
+            secteur_activite: newClient.secteur_activite || "",
             numero_rcs: newClient.numero_rcs,
-
             statut: newClient.statut as EntrepriseAPI["statut"],
-
             carte_ids: selectedCards,
-
+            // Données utilisateur
+            user_data: {
+              username: userData.username,
+              password: userData.password,
+              role: "CLIENT", // Forcer le rôle CLIENT
+            },
           }
 
+          try {
+            const response = await identitesService.createEntreprise(entrepriseData)
+            console.log("Réponse création entreprise:", response)
+            toast.success("Entreprise créée avec succès !")
 
-
-          await identitesService.createEntreprise(entrepriseData)
-
-          alert("Entreprise créée avec succès !")
-
+            // Si l'entreprise est créée mais pas l'utilisateur, afficher un message
+            if (!response.utilisateur_info) {
+              toast.warning(
+                "L'entreprise a été créée mais l'utilisateur n'a pas pu être créé. Veuillez créer l'utilisateur manuellement.",
+              )
+            } else {
+              toast.success("Utilisateur créé avec succès !")
+            }
+          } catch (error) {
+            console.error("Erreur détaillée:", error)
+            toast.error(`Erreur: ${error instanceof Error ? error.message : "Une erreur inconnue est survenue"}`)
+            throw error
+          }
         }
 
         fetchClients()
-
         closeAddModal()
-
       }
-
     } catch (error) {
-
       console.error("Erreur lors de la création du client:", error)
-
-      alert(`Erreur: ${error instanceof Error ? error.message : "Une erreur inconnue est survenue"}`)
-
+      toast.error(`Erreur: ${error instanceof Error ? error.message : "Une erreur inconnue est survenue"}`)
     }
-
   }
 
-
-
   const handleUpdateClient = async () => {
-
     try {
-
       if (!selectedClient) return
 
-
-
       if (clientType === "person") {
-
-        const formattedDate = newClient.date_naissance 
-
-          ? new Date(newClient.date_naissance).toISOString().split('T')[0]
-
-          : ''
-
-        
+        const formattedDate = newClient.date_naissance
+          ? new Date(newClient.date_naissance).toISOString().split("T")[0]
+          : ""
 
         const personneData: Partial<PersonneAPI> = {
-
           nom: newClient.nom,
-
           prenom: newClient.prenom,
-
           date_naissance: formattedDate,
-
           lieu_naissance: newClient.lieu_naissance,
-
           nationalite: newClient.nationalite,
-
           profession: newClient.profession,
-
           type_piece: newClient.type_piece as PersonneAPI["type_piece"],
-
           numero_piece: newClient.numero_piece,
-
           telephone: newClient.telephone,
-
           email: newClient.email,
-
           adresse: newClient.adresse,
-
           statut: newClient.statut as PersonneAPI["statut"],
-
         }
-
-
 
         await identitesService.updatePersonne(selectedClient.id, personneData)
         toast.success("Personne mise à jour avec succès !")
-        
-
       } else {
-
         const formattedDate = newClient.date_creation_entreprise
-
-          ? new Date(newClient.date_creation_entreprise).toISOString().split('T')[0]
-
-          : ''
-
-        
+          ? new Date(newClient.date_creation_entreprise).toISOString().split("T")[0]
+          : ""
 
         const entrepriseData: Partial<EntrepriseAPI> = {
-
           raison_sociale: newClient.raison_sociale,
-
           forme_juridique: newClient.forme_juridique,
-
           stat: newClient.stat,
-
           nif: newClient.nif,
-
           tva_intracom: newClient.tva_intracom,
-
           telephone: newClient.telephone,
-
           email: newClient.email,
-
           adresse_siege: newClient.adresse,
-
           date_creation_entreprise: formattedDate,
-
           secteur_activite: newClient.secteur_activite,
-
           numero_rcs: newClient.numero_rcs,
-
           statut: newClient.statut as EntrepriseAPI["statut"],
-
         }
-
-
 
         await identitesService.updateEntreprise(selectedClient.id, entrepriseData)
         toast.success("Entreprise mise à jour avec succès !")
-
       }
 
-
-
       fetchClients()
-
       closeAddModal()
-
       setIsEditing(false)
-
     } catch (error) {
-
       console.error("Erreur lors de la mise à jour du client:", error)
-
-      alert(`Erreur: ${error instanceof Error ? error.message : "Une erreur inconnue est survenue"}`)
-
+      toast.error(`Erreur: ${error instanceof Error ? error.message : "Une erreur inconnue est survenue"}`)
     }
-
   }
 
-
   const handleAssignCards = async () => {
-
     try {
-
       if (!selectedClient) return
 
-
-
       if (selectedClient.type === "person") {
-
         await identitesService.assignCartesToPersonne(selectedClient.id, selectedCards)
-
       } else {
-
         await identitesService.assignCartesToEntreprise(selectedClient.id, selectedCards)
-
       }
 
-
       toast.success("Cartes assignées avec succès !")
-
       fetchClients()
-
       setShowManageCardsModal(false)
-
     } catch (error) {
-
       console.error("Erreur lors de l'assignation des cartes:", error)
-
-      alert(`Erreur: ${error instanceof Error ? error.message : "Une erreur inconnue est survenue"}`)
-
+      toast.error(`Erreur: ${error instanceof Error ? error.message : "Une erreur inconnue est survenue"}`)
     }
-
   }
 
   const filteredCardsForModal = cartesDisponibles.filter(
@@ -616,10 +553,7 @@ const handleSubmit = async () => {
       carte.type_carte.toLowerCase().includes(searchCards.toLowerCase()),
   )
 
-  if (loadingClients) {
-    // Optionnel: Affichez un indicateur de chargement plus centralisé
-    // return <Layout><div className="p-6 text-center">Chargement des clients...</div></Layout>;
-  }
+  const maxSteps = isEditing ? 2 : 3
 
   return (
     <Layout>
@@ -639,9 +573,6 @@ const handleSubmit = async () => {
           </Button>
         </div>
       </div>
-
-      {/* Stats Cards - Remplacer par des données dynamiques si possible */}
-      {/* ... vos stats cards ... */}
 
       {/* Filters */}
       <Card className="mb-6">
@@ -688,7 +619,6 @@ const handleSubmit = async () => {
               >
                 <option value="registration">Date d'inscription</option>
                 <option value="name">Nom (A-Z)</option>
-                {/* <option value="spending">Dépenses</option> */}
               </select>
             </div>
           </div>
@@ -723,7 +653,6 @@ const handleSubmit = async () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Inscription
                     </th>
-                    {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activité</th> */}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Statut
                     </th>
@@ -777,10 +706,6 @@ const handleSubmit = async () => {
                           {client.type === "person" ? client.profession : client.secteur_activite}
                         </div>
                       </td>
-                      {/* <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{client.totalSpent || "N/A"}</div>
-                        <div className="text-sm text-gray-500">{client.transactionCount || 0} transactions</div>
-                      </td> */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <StatusBadge status={client.statut as any} />
                       </td>
@@ -789,7 +714,7 @@ const handleSubmit = async () => {
                           <Button variant="ghost" size="sm" onClick={() => openDetailsModal(client)}>
                             <EyeIcon className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => openEditModal(client)}> 
+                          <Button variant="ghost" size="sm" onClick={() => openEditModal(client)}>
                             <PencilIcon className="h-4 w-4" />
                           </Button>
                           <Button variant="ghost" size="sm" onClick={() => openManageCardsModal(client)}>
@@ -803,23 +728,24 @@ const handleSubmit = async () => {
               </table>
             </div>
           )}
-          {/* Pagination (à implémenter si nécessaire avec l'API) */}
         </CardContent>
       </Card>
 
-      {/* Recent Activity & Client Distribution (gardé pour l'exemple) */}
-      {/* ... vos sections Recent Activity et Client Distribution ... */}
-
-      {/* Add Client Modal */}
+      {/* Add/Edit Client Modal */}
       <Modal
         isOpen={showAddModal}
         onClose={closeAddModal}
-        title={`${isEditing ? 'Modifier' : 'Ajouter'} un client - Étape ${addStep}/2`}
+        title={`${isEditing ? "Modifier" : "Ajouter"} un client - Étape ${addStep}/${maxSteps}`}
         size="lg"
       >
         <div className="space-y-6">
           {/* Progress Bar */}
-          {/* ... votre progress bar ... */}
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div
+              className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${(addStep / maxSteps) * 100}%` }}
+            ></div>
+          </div>
 
           {/* Step 1: Client Information */}
           {addStep === 1 && (
@@ -908,7 +834,7 @@ const handleSubmit = async () => {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="lieu_naissance">Lieu de naissance </Label>
+                      <Label htmlFor="lieu_naissance">Lieu de naissance</Label>
                       <Input
                         id="lieu_naissance"
                         placeholder="Lieu de naissance"
@@ -965,7 +891,7 @@ const handleSubmit = async () => {
                       />
                     </div>
                   </div>
-                </> // Entreprise
+                </>
               ) : (
                 <>
                   <div>
@@ -1069,7 +995,7 @@ const handleSubmit = async () => {
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="date_creation_entreprise">Date de création entreprise </Label>
+                    <Label htmlFor="date_creation_entreprise">Date de création entreprise</Label>
                     <Input
                       id="date_creation_entreprise"
                       type="date"
@@ -1089,15 +1015,15 @@ const handleSubmit = async () => {
                 >
                   {clientType === "person" ? (
                     <>
-                      {" "}
-                      <option value="ACTIF">Actif</option> <option value="INACTIF">Inactif</option>{" "}
-                      <option value="SUSPENDU">Suspendu</option>{" "}
+                      <option value="ACTIF">Actif</option>
+                      <option value="INACTIF">Inactif</option>
+                      <option value="SUSPENDU">Suspendu</option>
                     </>
                   ) : (
                     <>
-                      {" "}
-                      <option value="ACTIVE">Active</option> <option value="INACTIVE">Inactive</option>{" "}
-                      <option value="SUSPENDUE">Suspendue</option>{" "}
+                      <option value="ACTIVE">Active</option>
+                      <option value="INACTIVE">Inactive</option>
+                      <option value="SUSPENDUE">Suspendue</option>
                     </>
                   )}
                 </select>
@@ -1105,8 +1031,99 @@ const handleSubmit = async () => {
             </div>
           )}
 
-          {/* Step 2: Card Assignment */}
-          {addStep === 2 && (
+          {/* Step 2: User Information (only for creation) */}
+          {addStep === 2 && !isEditing && (
+            <div className="space-y-4">
+              <div className="mb-4">
+                <h4 className="text-lg font-medium text-gray-900">Informations utilisateur</h4>
+                <p className="text-sm text-gray-600">
+                  Créez un compte utilisateur pour ce client avec le rôle "Client"
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="username">Nom d'utilisateur *</Label>
+                <Input
+                  id="username"
+                  placeholder="Nom d'utilisateur"
+                  value={userData.username}
+                  onChange={(e) => setUserData((prev) => ({ ...prev, username: e.target.value }))}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Le nom d'utilisateur sera utilisé pour se connecter à l'application
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="password">Mot de passe *</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Mot de passe"
+                    value={userData.password}
+                    onChange={(e) => setUserData((prev) => ({ ...prev, password: e.target.value }))}
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeSlashIcon className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <EyeIcon className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">Minimum 6 caractères</p>
+              </div>
+
+              <div>
+                <Label htmlFor="confirmPassword">Confirmer le mot de passe *</Label>
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirmer le mot de passe"
+                    value={userData.confirmPassword}
+                    onChange={(e) => setUserData((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeSlashIcon className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <EyeIcon className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+                {userData.password && userData.confirmPassword && userData.password !== userData.confirmPassword && (
+                  <p className="mt-1 text-xs text-red-600">Les mots de passe ne correspondent pas</p>
+                )}
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <UserIcon className="h-5 w-5 text-blue-500" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-blue-800">Rôle utilisateur</h3>
+                    <div className="mt-2 text-sm text-blue-700">
+                      <p>Ce compte utilisateur sera créé avec le rôle "Client"</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2/3: Card Assignment */}
+          {((addStep === 2 && isEditing) || (addStep === 3 && !isEditing)) && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-lg font-medium text-gray-900">Assigner des cartes RFID</h4>
@@ -1153,7 +1170,6 @@ const handleSubmit = async () => {
                           </div>
                         </div>
                         <div className="text-right">
-                          {/* Les infos de plafond ne sont pas dans CarteRFIDSimpleSerializer, donc optionnelles */}
                           {carte.plafond_quotidien && (
                             <div className="text-sm text-gray-900">Plafond: €{carte.plafond_quotidien}/jour</div>
                           )}
@@ -1189,195 +1205,109 @@ const handleSubmit = async () => {
               <Button variant="outline" onClick={closeAddModal}>
                 Annuler
               </Button>
-              {addStep < 2 ? (
+              {addStep < maxSteps ? (
                 <Button onClick={nextStep}>
                   Suivant
                   <ChevronRightIcon className="h-4 w-4 ml-2" />
                 </Button>
               ) : (
-                <Button onClick={handleSubmit}>
-
-                  {isEditing ? 'Mettre à jour' : 'Créer le client'}
-
-                </Button>
+                <Button onClick={handleSubmit}>{isEditing ? "Mettre à jour" : "Créer le client"}</Button>
               )}
             </div>
           </div>
         </div>
       </Modal>
+
       {/* Manage Cards Modal */}
-
       <Modal
-
         isOpen={showManageCardsModal}
-
         onClose={closeManageCardsModal}
-
         title={`Gérer les cartes RFID - ${selectedClient?.type === "person" ? `${selectedClient?.prenom} ${selectedClient?.nom}` : selectedClient?.raison_sociale}`}
-
         size="lg"
-
       >
-
         <div className="space-y-4">
-
           <div className="flex items-center justify-between">
-
             <h4 className="text-lg font-medium text-gray-900">Assigner des cartes RFID</h4>
-
             <div className="text-sm text-gray-500">
-
-              {selectedCards.length} carte(s) sélectionnée(s) sur {selectedClient?.cartes_rfid_details?.length || 0} déjà assignées
-
+              {selectedCards.length} carte(s) sélectionnée(s) sur {selectedClient?.cartes_rfid_details?.length || 0}{" "}
+              déjà assignées
             </div>
-
           </div>
-
           <div className="relative">
-
             <MagnifyingGlassIcon className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-
             <Input
-
               placeholder="Rechercher une carte (UID, N° Série)..."
-
               value={searchCards}
-
               onChange={(e) => setSearchCards(e.target.value)}
-
               className="pl-10"
-
             />
-
           </div>
-
           {loadingCartes && <div className="text-center py-8 text-gray-500">Chargement des cartes...</div>}
-
           {!loadingCartes && (
-
             <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-lg">
-
               {filteredCardsForModal.map((carte) => (
-
                 <div
-
                   key={carte.id}
-
                   className={`p-4 border-b border-gray-200 last:border-b-0 hover:bg-gray-50 cursor-pointer ${selectedCards.includes(carte.id) ? "bg-purple-50 border-purple-200" : ""}`}
-
                   onClick={() => toggleCardSelection(carte.id)}
-
                 >
-
                   <div className="flex items-center justify-between">
-
                     <div className="flex items-center space-x-3">
-
                       <input
-
                         type="checkbox"
-
                         checked={selectedCards.includes(carte.id)}
-
                         onChange={() => toggleCardSelection(carte.id)}
-
                         className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-
                       />
-
                       <div className="flex-1">
-
                         <div className="flex items-center space-x-2">
-
                           <span className="text-sm font-medium text-gray-900">{carte.code_uid}</span>
-
                           <span
-
                             className={`px-2 py-1 text-xs rounded-full ${carte.type_carte === "STANDARD" ? "bg-blue-100 text-blue-800" : carte.type_carte === "PREMIUM" ? "bg-purple-100 text-purple-800" : "bg-yellow-100 text-yellow-800"}`}
-
                           >
-
                             {carte.type_carte}
-
                           </span>
-
                         </div>
-
                         <div className="text-xs text-gray-500 mt-1">
-
                           SN: {carte.numero_serie} • Expire: {carte.date_expiration || "N/A"}
-
                         </div>
-
                       </div>
-
                     </div>
-
                     <div className="text-right">
-
                       {carte.plafond_quotidien && (
-
                         <div className="text-sm text-gray-900">Plafond: €{carte.plafond_quotidien}/jour</div>
-
                       )}
-
-                      {carte.solde_maximum && (
-
-                        <div className="text-xs text-gray-500">Max: €{carte.solde_maximum}</div>
-
-                      )}
-
+                      {carte.solde_maximum && <div className="text-xs text-gray-500">Max: €{carte.solde_maximum}</div>}
                     </div>
-
                   </div>
-
                 </div>
-
               ))}
-
             </div>
-
           )}
-
           {!loadingCartes && filteredCardsForModal.length === 0 && (
-
             <div className="text-center py-8 text-gray-500">
-
               <CreditCardIcon className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-
               <p>Aucune carte disponible trouvée pour les critères actuels.</p>
-
             </div>
-
           )}
-
         </div>
-
         <div className="flex justify-end pt-6 border-t border-gray-200">
-
           <div className="flex space-x-3">
-
             <Button variant="outline" onClick={closeManageCardsModal}>
-
               Annuler
-
             </Button>
-
             <Button onClick={handleAssignCards}>Enregistrer les modifications</Button>
-
           </div>
-
         </div>
-
       </Modal>
-      {/* Client Detail Modal (Adaptation des champs) */}
+
+      {/* Client Detail Modal */}
       <Modal isOpen={showDetailsModal} onClose={() => setShowDetailsModal(false)} title="Détails du client" size="lg">
         {selectedClient && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="md:col-span-1">
                 <div className="flex flex-col items-center">
-                  {/* ... Avatar et nom/raison sociale ... */}
                   <h4 className="text-lg font-medium text-gray-900">
                     {selectedClient.type === "person"
                       ? `${selectedClient.prenom} ${selectedClient.nom}`
@@ -1459,14 +1389,12 @@ const handleSubmit = async () => {
                             {card.type_carte} - Statut: {card.statut}
                           </p>
                         </div>
-                        {/* Actions sur les cartes (non implémenté) */}
                       </div>
                     ))}
                   {(!selectedClient.cartes_rfid_details || selectedClient.cartes_rfid_details.length === 0) && (
                     <p className="text-sm text-gray-500">Aucune carte RFID associée.</p>
                   )}
                 </div>
-                {/* Les dépenses et transactions nécessitent des données/endpoints supplémentaires */}
               </div>
             </div>
             <div className="flex justify-end">
