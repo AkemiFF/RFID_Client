@@ -1,5 +1,6 @@
 import api from "@/lib/api"
 import { apiAdmin } from "../api-service"
+import  apiClient from "../api-service"
 export interface ClientCard {
   id: string
   numero: string
@@ -71,8 +72,8 @@ export interface CardStatistics {
 class ClientCardsService {
   async getCards(): Promise<ClientCard[]> {
     try {
-      const response = await apiAdmin.get("/client/cards")
-      return response.data
+      const response = await apiAdmin.get("/cartes/client/cards")
+      return response.data.results
     } catch (error) {
       throw new Error("Impossible de récupérer les cartes")
     }
@@ -80,7 +81,7 @@ class ClientCardsService {
 
   async getCard(cardId: string): Promise<ClientCard> {
     try {
-      const response = await apiAdmin.get(`/client/cards/${cardId}`)
+      const response = await apiAdmin.get(`/cartes/client/cards/${cardId}`)
       return response.data
     } catch (error) {
       throw new Error("Impossible de récupérer les détails de la carte")
