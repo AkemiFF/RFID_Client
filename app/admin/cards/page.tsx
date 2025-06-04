@@ -26,6 +26,8 @@ export default function CardsPage() {
   })
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [selectedCard, setSelectedCard] = useState<CarteRFID | null>(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [editingCard, setEditingCard] = useState<CarteRFID | null>(null)
 
   const {
     data: cartes,
@@ -36,10 +38,17 @@ export default function CardsPage() {
   const { data: personnes } = useQuery("personnes", () => identitesService.getPersonnes({ page_size: 100 }))
 
   const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
+    register: registerCreate,
+    handleSubmit: handleSubmitCreate,
+    reset: resetCreate,
+    formState: { errors: errorsCreate },
+  } = useForm()
+
+  const {
+    register: registerEdit,
+    handleSubmit: handleSubmitEdit,
+    reset: resetEdit,
+    formState: { errors: errorsEdit },
   } = useForm()
 
   // Fonction pour filtrer les cartes côté frontend
@@ -95,9 +104,6 @@ export default function CardsPage() {
 
   const handleCreateCard = async (data: any) => {
     try {
-      // Vérifier s'il y a une assignation
-      const hasAssignment = data.personne || data.entreprise
-
       const cardData = {
         ...data,
         // Champs financiers avec valeurs par défaut
@@ -105,32 +111,70 @@ export default function CardsPage() {
         plafond_mensuel: Number.parseFloat(data.plafond_mensuel) || 5000,
         solde_maximum: Number.parseFloat(data.solde_maximum) || 10000,
 
+        // Utiliser le code_uid saisi manuellement
+        code_uid: data.code_uid,
+
         // Champs requis générés automatiquement
-        code_uid: `UID_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         numero_serie: `CARD_${Date.now()}_${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
         version_securite: "v1.0",
         cle_chiffrement: `KEY_${Math.random().toString(36).substr(2, 32)}`,
 
-        // Statut par défaut INACTIVE, ACTIVE seulement si assignée
-        statut: hasAssignment ? "ACTIVE" : "INACTIVE",
+        // Statut par défaut INACTIVE (pas d'assignation)
+        statut: "INACTIVE",
 
         // Autres champs
         lieu_emission: "Agence principale",
 
-        // Nettoyer les champs vides pour éviter les erreurs
-        personne: data.personne || null,
-        entreprise: data.entreprise || null,
+        // Pas d'assignation par défaut
+        personne: null,
+        entreprise: null,
       }
 
       await cartesService.createCarte(cardData)
-      toast.success(`Carte créée avec succès ${hasAssignment ? "et activée" : "(statut: inactive)"}`)
+      toast.success("Carte créée avec succès (statut: inactive)")
       setIsCreateModalOpen(false)
-      reset()
+      resetCreate()
       refetch()
     } catch (error: any) {
       console.error("Erreur lors de la création:", error)
       const errorMessage =
         error.response?.data?.detail || error.response?.data?.message || "Erreur lors de la création de la carte"
+      toast.error(errorMessage)
+    }
+  }
+
+  const handleEditCard = async (data: any) => {
+    try {
+      if (!editingCard) {
+        toast.error("Aucune carte sélectionnée pour modification")
+        return
+      }
+
+      console.log("Données de modification:", data)
+      console.log("Carte en cours de modification:", editingCard.id)
+
+      const updateData = {
+        code_uid: data.code_uid,
+        plafond_quotidien: Number.parseFloat(data.plafond_quotidien),
+        plafond_mensuel: Number.parseFloat(data.plafond_mensuel),
+        date_expiration: data.date_expiration,
+        solde: Number.parseFloat(data.solde),
+      }
+
+      console.log("Données à envoyer:", updateData)
+
+      const result = await cartesService.updateCarte(editingCard.id, updateData)
+      console.log("Résultat de la modification:", result)
+
+      toast.success("Carte modifiée avec succès")
+      setIsEditModalOpen(false)
+      setEditingCard(null)
+      resetEdit()
+      refetch()
+    } catch (error: any) {
+      console.error("Erreur lors de la modification:", error)
+      const errorMessage =
+        error.response?.data?.detail || error.response?.data?.message || "Erreur lors de la modification de la carte"
       toast.error(errorMessage)
     }
   }
@@ -328,7 +372,7 @@ export default function CardsPage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
                             {carte.personne
-                              ? `${carte.personne.prenom || ''} ${carte.personne.nom || ''}`.trim() || "Nom non renseigné"
+                              ? `${carte.personne.prenom} ${carte.personne.nom}`
                               : carte.entreprise
                                 ? carte.entreprise.raison_sociale
                                 : "Non assigné"}
@@ -378,7 +422,14 @@ export default function CardsPage() {
                                 </svg>
                               </button>
                             )}
-                            <button className="text-purple-600 hover:text-purple-900" title="Modifier">
+                            <button
+                              onClick={() => {
+                                setEditingCard(carte)
+                                setIsEditModalOpen(true)
+                              }}
+                              className="text-purple-600 hover:text-purple-900"
+                              title="Modifier"
+                            >
                               <PencilIcon className="h-5 w-5" />
                             </button>
                             {carte.statut === "ACTIVE" ? (
@@ -477,11 +528,11 @@ export default function CardsPage() {
         title="Créer une nouvelle carte RFID"
         size="lg"
       >
-        <form onSubmit={handleSubmit(handleCreateCard)} className="space-y-4">
+        <form onSubmit={handleSubmitCreate(handleCreateCard)} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Type de carte</label>
             <select
-              {...register("type_carte", { required: "Le type de carte est requis" })}
+              {...registerCreate("type_carte", { required: "Le type de carte est requis" })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
             >
               <option value="">Sélectionnez un type</option>
@@ -489,48 +540,42 @@ export default function CardsPage() {
               <option value="PREMIUM">Premium</option>
               <option value="ENTREPRISE">Entreprise</option>
             </select>
-            {errors.type_carte && <p className="mt-1 text-sm text-red-600">{errors.type_carte.message as string}</p>}
+            {errorsCreate.type_carte && (
+              <p className="mt-1 text-sm text-red-600">{errorsCreate.type_carte.message as string}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Personne (optionnel)
-              <span className="text-xs text-gray-500 font-normal ml-2">- Peut être assignée ultérieurement</span>
-            </label>
-            <select
-              {...register("personne")}
+            <label className="block text-sm font-medium text-gray-700 mb-1">Code de la carte *</label>
+            <input
+              type="text"
+              {...registerCreate("code_uid", { required: "Le code de la carte est requis" })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
-            >
-              <option value="">Aucune assignation pour le moment</option>
-              {personnes?.results?.map((personne: any) => (
-                <option key={personne.id} value={personne.id}>
-                  {personne.prenom} {personne.nom} ({personne.email})
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-gray-500">
-              Si aucune personne n'est sélectionnée, la carte sera créée avec le statut "Inactive" et devra être
-              assignée avant activation.
-            </p>
+              placeholder="Saisissez le code UID de la carte"
+            />
+            {errorsCreate.code_uid && (
+              <p className="mt-1 text-sm text-red-600">{errorsCreate.code_uid.message as string}</p>
+            )}
+            <p className="mt-1 text-xs text-gray-500">Code unique d'identification de la carte RFID</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Plafond quotidien (Ar)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Plafond quotidien (€)</label>
               <input
                 type="number"
                 step="0.01"
-                {...register("plafond_quotidien")}
+                {...registerCreate("plafond_quotidien")}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
                 placeholder="1000.00"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Plafond mensuel (Ar)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Plafond mensuel (€)</label>
               <input
                 type="number"
                 step="0.01"
-                {...register("plafond_mensuel")}
+                {...registerCreate("plafond_mensuel")}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
                 placeholder="5000.00"
               />
@@ -541,11 +586,11 @@ export default function CardsPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Date d'expiration</label>
             <input
               type="date"
-              {...register("date_expiration", { required: "La date d'expiration est requise" })}
+              {...registerCreate("date_expiration", { required: "La date d'expiration est requise" })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
             />
-            {errors.date_expiration && (
-              <p className="mt-1 text-sm text-red-600">{errors.date_expiration.message as string}</p>
+            {errorsCreate.date_expiration && (
+              <p className="mt-1 text-sm text-red-600">{errorsCreate.date_expiration.message as string}</p>
             )}
           </div>
 
@@ -602,16 +647,16 @@ export default function CardsPage() {
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Solde actuel</dt>
                     <dd className="text-sm text-gray-900 font-semibold">
-                      Ar{Number(selectedCard.solde || 0).toFixed(2)}
+                      €{Number(selectedCard.solde || 0).toFixed(2)}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Plafond quotidien</dt>
-                    <dd className="text-sm text-gray-900">Ar{Number(selectedCard.plafond_quotidien || 0).toFixed(2)}</dd>
+                    <dd className="text-sm text-gray-900">€{Number(selectedCard.plafond_quotidien || 0).toFixed(2)}</dd>
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Plafond mensuel</dt>
-                    <dd className="text-sm text-gray-900">Ar{Number(selectedCard.plafond_mensuel || 0).toFixed(2)}</dd>
+                    <dd className="text-sm text-gray-900">€{Number(selectedCard.plafond_mensuel || 0).toFixed(2)}</dd>
                   </div>
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Nombre de transactions</dt>
@@ -694,6 +739,110 @@ export default function CardsPage() {
               )}
             </div>
           </div>
+        </Modal>
+      )}
+
+      {/* Edit Card Modal */}
+      {editingCard && (
+        <Modal
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false)
+            setEditingCard(null)
+            resetEdit()
+          }}
+          title="Modifier la carte RFID"
+          size="lg"
+        >
+          <form onSubmit={handleSubmitEdit(handleEditCard)} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Code de la carte *</label>
+              <input
+                type="text"
+                {...registerEdit("code_uid", { required: "Le code de la carte est requis" })}
+                defaultValue={editingCard.code_uid}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                placeholder="Code UID de la carte"
+              />
+              {errorsEdit.code_uid && (
+                <p className="mt-1 text-sm text-red-600">{errorsEdit.code_uid.message as string}</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Plafond quotidien (Ar) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  {...registerEdit("plafond_quotidien", { required: "Le plafond quotidien est requis" })}
+                  defaultValue={editingCard.plafond_quotidien}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                />
+                {errorsEdit.plafond_quotidien && (
+                  <p className="mt-1 text-sm text-red-600">{errorsEdit.plafond_quotidien.message as string}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Plafond mensuel (Ar) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  {...registerEdit("plafond_mensuel", { required: "Le plafond mensuel est requis" })}
+                  defaultValue={editingCard.plafond_mensuel}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+                />
+                {errorsEdit.plafond_mensuel && (
+                  <p className="mt-1 text-sm text-red-600">{errorsEdit.plafond_mensuel.message as string}</p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date d'expiration *</label>
+              <input
+                type="date"
+                {...registerEdit("date_expiration", { required: "La date d'expiration est requise" })}
+                defaultValue={editingCard.date_expiration}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+              />
+              {errorsEdit.date_expiration && (
+                <p className="mt-1 text-sm text-red-600">{errorsEdit.date_expiration.message as string}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Solde (Ar) *</label>
+              <input
+                type="number"
+                step="0.01"
+                {...registerEdit("solde", { required: "Le solde est requis" })}
+                defaultValue={editingCard.solde}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-purple-500 focus:border-purple-500"
+              />
+              {errorsEdit.solde && <p className="mt-1 text-sm text-red-600">{errorsEdit.solde.message as string}</p>}
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditModalOpen(false)
+                  setEditingCard(null)
+                  resetEdit()
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700"
+              >
+                Modifier la carte
+              </button>
+            </div>
+          </form>
         </Modal>
       )}
     </Layout>
