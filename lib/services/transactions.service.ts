@@ -8,6 +8,7 @@ export interface Transaction {
   montant: number
   solde_avant: number
   solde_apres: number
+  carte_receipt?: string
   merchant_id?: string
   merchant_nom?: string
   terminal_id?: string
@@ -50,7 +51,11 @@ export interface TransactionFilters {
 
 class TransactionsService {
   async getTransactions(filters: TransactionFilters = {}) {
+<<<<<<< HEAD
     const response = await apiClient.get("/transactions/transactions/", { params: filters })
+=======
+    const response = await apiAdmin.get("/transactions/transactions/", { params: filters })
+>>>>>>> origin/Leomyre
     return response.data
   }
 

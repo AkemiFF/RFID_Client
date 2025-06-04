@@ -15,6 +15,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
+import { clientCardsService } from "@/lib/services/client-cards.service"
 
 interface Transaction {
   id: number
@@ -28,9 +29,9 @@ interface Transaction {
 interface CarteRFID {
   id: number
   numero: string
-  type: string
+  type: "standard" | "premium" | "business" | string
   solde: number
-  statut: "active" | "bloquee"
+  statut: "active" | "bloquee" | "suspendue" | "expiree"
   dateExpiration: string
 }
 
@@ -43,71 +44,90 @@ export default function ClientDashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Charger les données utilisateur
-    const userData = localStorage.getItem("client_user")
-    if (userData) {
-      const user = JSON.parse(userData)
-      setUser(user)
+    const loadData = async () => {
+      try {
+        // Charger les données utilisateur
+        const userData = localStorage.getItem("auth")
+        if (userData) {
+          const authData = JSON.parse(userData)
+          setUser(authData)
 
-      // Données simulées
-      setCartes([
-        {
-          id: 1,
-          numero: "1234567890123456",
-          type: "Standard",
-          solde: 75000,
-          statut: "active",
-          dateExpiration: "2025-12-31",
-        },
-        {
-          id: 2,
-          numero: "9876543210987654",
-          type: "Premium",
-          solde: 50000,
-          statut: "active",
-          dateExpiration: "2026-06-30",
-        },
-      ])
+          // Récupérer les cartes depuis l'API
+          const cards = await clientCardsService.getCards()
+          console.log(cards);
 
-      setTransactions([
-        {
-          id: 1,
-          type: "debit",
-          montant: 15000,
-          description: "Achat supermarché",
-          date: "2024-01-27 14:30",
-          commercant: "SuperMarché Plus",
-        },
-        {
-          id: 2,
-          type: "credit",
-          montant: 50000,
-          description: "Rechargement carte",
-          date: "2024-01-27 10:15",
-        },
-        {
-          id: 3,
-          type: "debit",
-          montant: 8500,
-          description: "Restaurant",
-          date: "2024-01-26 19:45",
-          commercant: "Chez Marie",
-        },
-        {
-          id: 4,
-          type: "debit",
-          montant: 25000,
-          description: "Station essence",
-          date: "2024-01-26 08:20",
-          commercant: "Total Energies",
-        },
-      ])
+          setCartes(cards.map(card => ({
+            id: parseInt(card.id),
+            numero: card.numero,
+            type: clientCardsService.getCardTypeLabel(card.type),
+            solde: card.solde,
+            statut: card.statut,
+            dateExpiration: card.dateExpiration
+          })))
+
+          // Récupérer les transactions pour toutes les cartes
+          const allTransactions = []
+          for (const card of cards) {
+            const { transactions } = await clientCardsService.getCardTransactions(card.id)
+            allTransactions.push(...transactions.map((t, i) => ({
+              id: parseInt(`${card.id}${i}`),
+              type: t.type,
+              montant: t.montant,
+              description: t.description,
+              date: t.date,
+              commercant: t.commercant
+            })))
+          }
+          setTransactions(allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()))
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des données:", error)
+        // Fallback aux données simulées en cas d'erreur
+        setCartes([
+          {
+            id: 1,
+            numero: "1234567890123456",
+            type: "Standard",
+            solde: 75000,
+            statut: "active",
+            dateExpiration: "2025-12-31",
+          },
+          {
+            id: 2,
+            numero: "9876543210987654",
+            type: "Premium",
+            solde: 50000,
+            statut: "active",
+            dateExpiration: "2026-06-30",
+          },
+        ])
+        setTransactions([
+          {
+            id: 1,
+            type: "debit",
+            montant: 15000,
+            description: "Achat supermarché",
+            date: new Date().toISOString(),
+            commercant: "SuperMarché Plus",
+          },
+          {
+            id: 2,
+            type: "credit",
+            montant: 50000,
+            description: "Rechargement carte",
+            date: new Date(Date.now() - 86400000).toISOString(),
+          },
+        ])
+      } finally {
+        setLoading(false)
+      }
     }
-    setLoading(false)
+
+    loadData()
   }, [])
 
   const formatMontant = (montant: number) => {
-    return new Intl.NumberFormat("fr-FR").format(montant) + " Ar"
+    return clientCardsService.formatAmount(montant)
   }
 
   const soldeTotal = cartes.reduce((total, carte) => total + carte.solde, 0)
@@ -125,7 +145,7 @@ export default function ClientDashboard() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Bonjour, {user?.prenom} ! 👋</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Bonjour, {user?.user?.username} ! 👋</h1>
           <p className="text-gray-600">Voici un aperçu de votre compte</p>
         </div>
       </div>
@@ -197,7 +217,10 @@ export default function ClientDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:shadow-md transition-shadow">
+        <Card
+          className="cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => router.push("/client/recharge")}
+        >
           <CardContent className="p-4 text-center">
             <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
               <PlusIcon className="h-6 w-6 text-purple-600" />
@@ -231,7 +254,11 @@ export default function ClientDashboard() {
           <CardContent>
             <div className="space-y-4">
               {cartes.map((carte) => (
-                <div key={carte.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div
+                  key={carte.id}
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                  onClick={() => router.push(`/client/cards/${carte.id}`)}
+                >
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg flex items-center justify-center">
                       <CreditCardIcon className="h-5 w-5 text-white" />
@@ -244,11 +271,14 @@ export default function ClientDashboard() {
                   <div className="text-right">
                     <p className="font-medium text-gray-900">{showBalance ? formatMontant(carte.solde) : "••••••"}</p>
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        carte.statut === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                      }`}
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${carte.statut === "active"
+                        ? "bg-green-100 text-green-800"
+                        : carte.statut === "bloquee"
+                          ? "bg-red-100 text-red-800"
+                          : "bg-yellow-100 text-yellow-800"
+                        }`}
                     >
-                      {carte.statut === "active" ? "Active" : "Bloquée"}
+                      {clientCardsService.getCardStatusLabel(carte.statut)}
                     </span>
                   </div>
                 </div>
@@ -269,9 +299,8 @@ export default function ClientDashboard() {
                 <div key={transaction.id} className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        transaction.type === "credit" ? "bg-green-100" : "bg-red-100"
-                      }`}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${transaction.type === "credit" ? "bg-green-100" : "bg-red-100"
+                        }`}
                     >
                       {transaction.type === "credit" ? (
                         <ArrowDownIcon className="h-4 w-4 text-green-600" />

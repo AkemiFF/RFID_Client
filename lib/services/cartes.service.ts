@@ -1,4 +1,3 @@
-import api from "@/lib/api"
 import { apiAdmin } from "../api-service"
 
 export interface CarteRFID {
@@ -10,7 +9,7 @@ export interface CarteRFID {
   plafond_quotidien: number
   plafond_mensuel: number
   solde_maximum: number
-  statut: "ACTIVE" | "BLOQUEE" | "EXPIREE" | "PERDUE" | "VOLEE"
+  statut: "ACTIVE" | "INACTIVE" | "BLOQUEE" | "EXPIREE" | "PERDUE" | "VOLEE"
   motif_blocage?: string
   date_emission: string
   date_activation?: string
@@ -31,6 +30,18 @@ export interface CarteRFID {
   }
 }
 
+export interface CarteDisponibleAPI {
+  id: string
+  code_uid: string
+  numero_serie: string
+  type_carte: "STANDARD" | "PREMIUM" | "ENTREPRISE"
+  statut: "ACTIVE" | "INACTIVE" | "BLOQUEE" | "EXPIREE" | "PERDUE" | "VOLEE"
+  plafond_quotidien?: number
+  plafond_mensuel?: number
+  solde_maximum?: number
+  date_expiration?: string
+}
+
 export interface CreateCarteData {
   personne?: string
   entreprise?: string
@@ -45,6 +56,7 @@ export interface CreateCarteData {
 export interface CarteFilters {
   statut?: string
   type_carte?: string
+  assignation?: string
   date_creation?: string
   search?: string
   page?: number
@@ -58,26 +70,26 @@ class CartesService {
   }
 
   async getCarte(id: string) {
-    const response = await api.get(`/cartes/cartes/${id}/`)
+    const response = await apiAdmin.get(`/cartes/cartes/${id}/`)
     return response.data
   }
 
   async createCarte(data: CreateCarteData) {
-    const response = await api.post("/cartes/cartes/", data)
+    const response = await apiAdmin.post("/cartes/cartes/", data)
     return response.data
   }
 
   async updateCarte(id: string, data: Partial<CreateCarteData>) {
-    const response = await api.patch(`/cartes/cartes/${id}/`, data)
+    const response = await apiAdmin.patch(`/cartes/cartes/${id}/`, data)
     return response.data
   }
 
   async deleteCarte(id: string) {
-    await api.delete(`/cartes/cartes/${id}/`)
+    await apiAdmin.delete(`/cartes/cartes/${id}/`)
   }
 
   async blockerCarte(id: string, motif: string) {
-    const response = await api.patch(`/cartes/cartes/${id}/`, {
+    const response = await apiAdmin.patch(`/cartes/cartes/${id}/`, {
       statut: "BLOQUEE",
       motif_blocage: motif,
     })
@@ -85,7 +97,7 @@ class CartesService {
   }
 
   async activerCarte(id: string) {
-    const response = await api.patch(`/cartes/cartes/${id}/`, {
+    const response = await apiAdmin.patch(`/cartes/cartes/${id}/`, {
       statut: "ACTIVE",
       date_activation: new Date().toISOString(),
     })
@@ -93,8 +105,19 @@ class CartesService {
   }
 
   async getHistoriqueStatuts(carteId: string) {
-    const response = await api.get(`/cartes/historique-statuts/?carte=${carteId}`)
+    const response = await apiAdmin.get(`/cartes/historique-statuts/?carte=${carteId}`)
     return response.data
+  }
+
+  async getCartesDisponibles(): Promise<CarteDisponibleAPI[]> {
+    try {
+      // Utiliser le bon endpoint configuré dans les URLs Django
+      const response = await apiAdmin.get("/identites/cartes-disponibles/")
+      return response.data.results || response.data
+    } catch (error) {
+      console.error("Erreur lors de la récupération des cartes disponibles:", error)
+      throw new Error("Impossible de récupérer les cartes disponibles")
+    }
   }
 }
 

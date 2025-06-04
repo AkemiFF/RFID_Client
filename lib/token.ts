@@ -52,7 +52,7 @@ export const authFetchAdmin = async (input: RequestInfo, init?: RequestInit) => 
 export const refreshToken = async (): Promise<string> => {
     const refreshToken = getRefreshToken();
 
-    const response = await fetch(`${BASE_URL}/api/auth/token/refresh/`, {
+    const response = await fetch(`${BASE_URL}/api/auth/refresh/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh: refreshToken }),
@@ -68,7 +68,7 @@ export const refreshToken = async (): Promise<string> => {
     // Mettre à jour uniquement le token d'accès dans localStorage
     const authData = JSON.parse(localStorage.getItem('auth') || '{}');
     authData.access = data.access;
-    authData.access_expires_a = newAccessExpiresAt;
+    authData.access_expires_at = newAccessExpiresAt;
     localStorage.setItem('auth', JSON.stringify(authData));
 
     return data.access;
@@ -77,7 +77,7 @@ export const refreshToken = async (): Promise<string> => {
 export const refreshAdminToken = async (): Promise<string> => {
     const refreshToken = getAdminRefreshToken();
 
-    const response = await fetch(`${BASE_URL}/api/auth/token/refresh/admin/`, {
+    const response = await fetch(`${BASE_URL}/api/auth/refresh/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh: refreshToken }),
